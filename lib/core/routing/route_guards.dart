@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../utils/constants.dart';
+import '../utils/constants.dart';
 import '../providers/auth_provider.dart';
 
 class RouteGuards {
