@@ -30,6 +30,8 @@ class RouteGuards {
           return '/doctor';
         case AppConstants.roleHospital:
           return '/authority';
+        case AppConstants.roleGovt:
+          return '/government';
         default:
           return '/';
       }
@@ -43,6 +45,9 @@ class RouteGuards {
       return '/login';
     }
     if (state.uri.path.startsWith('/authority') && authState.role != AppConstants.roleHospital) {
+      return '/login';
+    }
+    if (state.uri.path.startsWith('/government') && authState.role != AppConstants.roleGovt) {
       return '/login';
     }
 

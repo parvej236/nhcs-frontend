@@ -127,3 +127,6 @@ final patientImagingReportsProvider = FutureProvider<List<ImagingReport>>((ref) 
   final repo = ref.read(patientRepositoryProvider);
   return repo.getImagingReports(_currentPatientHealthId);
 });
+
+// 10. Navigation Selection Provider
+final patientNavigationProvider = StateProvider<int>((ref) => 0);

@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/ai_insight_panel.dart';
+import '../../../core/widgets/notification_dropdown.dart';
+import '../../../core/providers/notifications_provider.dart';
 import '../data/models/appointment.dart';
 import '../data/models/dashboard_summary.dart';
 import '../data/models/medical_record.dart';
@@ -52,7 +55,7 @@ class PatientDashboardPage extends ConsumerWidget {
               Expanded(
                 child: Column(
                   children: [
-                    _buildHeader(context),
+                    _buildHeader(context, ref),
                     Expanded(
                       child: SingleChildScrollView(
                         padding: const EdgeInsets.all(24),
@@ -88,7 +91,9 @@ class PatientDashboardPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildHeader(BuildContext context) {
+  Widget _buildHeader(BuildContext context, WidgetRef ref) {
+    final notifications = ref.watch(patientNotificationsProvider);
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       decoration: BoxDecoration(
@@ -127,7 +132,14 @@ class PatientDashboardPage extends ConsumerWidget {
             ),
           ),
           const SizedBox(width: 16),
-          _headerIcon(Icons.notifications_none_rounded, badge: '3'),
+          NotificationDropdown(
+            notifications: notifications,
+            onMarkRead: (id) => ref.read(patientNotificationsProvider.notifier).markAsRead(id),
+            onMarkAllRead: () => ref.read(patientNotificationsProvider.notifier).markAllAsRead(),
+            onNavigate: (tabIndex) {
+              ref.read(patientNavigationProvider.notifier).state = tabIndex;
+            },
+          ),
           const SizedBox(width: 8),
           _headerIcon(Icons.settings_outlined),
         ],
@@ -266,41 +278,15 @@ class PatientDashboardPage extends ConsumerWidget {
   }
 
   Widget _buildAISummary(AiHealthSummary summary) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [AppColors.warningLight, AppColors.warningLight.withOpacity(0.3)],
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-        ),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.warning.withOpacity(0.3)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(color: AppColors.warning.withOpacity(0.2), borderRadius: BorderRadius.circular(10)),
-            child: const Icon(Icons.auto_awesome_rounded, color: AppColors.warning, size: 20),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('AI Health Summary', style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14, color: Colors.orange.shade900)),
-                const SizedBox(height: 4),
-                Text(
-                  summary.summaryText,
-                  style: GoogleFonts.inter(fontSize: 13, color: AppColors.textSecondary, height: 1.5),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+    return AiInsightPanel(
+      title: 'AI Health Assessment & Vitals Briefing',
+      description: summary.summaryText,
+      type: 'warning',
+      recommendations: const [
+        'Vitals are stable, keep monitoring BP daily.',
+        'Take prescribed Metformin 500mg as instructed by Dr. Ahmed Khan.',
+        'Avoid high sodium meals and keep well hydrated.'
+      ],
     );
   }
 
