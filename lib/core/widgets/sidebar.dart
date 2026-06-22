@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_colors.dart';
+import '../providers/auth_provider.dart';
 
 // Sidebar for patient role
-class PatientSidebar extends StatelessWidget {
+class PatientSidebar extends ConsumerWidget {
   final int selectedIndex;
   final Function(int) onItemSelected;
 
   const PatientSidebar({super.key, required this.selectedIndex, required this.onItemSelected});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       width: 260,
       color: AppColors.sidebar,
@@ -49,7 +51,7 @@ class PatientSidebar extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.all(16),
             child: InkWell(
-              onTap: () => context.go('/'),
+              onTap: () => ref.read(authProvider.notifier).logout(),
               borderRadius: BorderRadius.circular(12),
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
@@ -111,14 +113,14 @@ class PatientSidebar extends StatelessWidget {
 }
 
 // Sidebar for doctor role
-class DoctorSidebar extends StatelessWidget {
+class DoctorSidebar extends ConsumerWidget {
   final int selectedIndex;
   final Function(int) onItemSelected;
 
   const DoctorSidebar({super.key, required this.selectedIndex, required this.onItemSelected});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       width: 260,
       color: AppColors.sidebar,
@@ -154,7 +156,7 @@ class DoctorSidebar extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.all(16),
             child: InkWell(
-              onTap: () => context.go('/'),
+              onTap: () => ref.read(authProvider.notifier).logout(),
               borderRadius: BorderRadius.circular(12),
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
@@ -203,14 +205,14 @@ class DoctorSidebar extends StatelessWidget {
 }
 
 // Sidebar for hospital authority role
-class HospitalSidebar extends StatelessWidget {
+class HospitalSidebar extends ConsumerWidget {
   final int selectedIndex;
   final Function(int) onItemSelected;
 
   const HospitalSidebar({super.key, required this.selectedIndex, required this.onItemSelected});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       width: 260,
       color: AppColors.sidebar,
@@ -247,7 +249,7 @@ class HospitalSidebar extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.all(16),
             child: InkWell(
-              onTap: () => context.go('/'),
+              onTap: () => ref.read(authProvider.notifier).logout(),
               borderRadius: BorderRadius.circular(12),
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
@@ -296,14 +298,14 @@ class HospitalSidebar extends StatelessWidget {
 }
 
 // Sidebar for government authority role
-class GovtSidebar extends StatelessWidget {
+class GovtSidebar extends ConsumerWidget {
   final int selectedIndex;
   final Function(int) onItemSelected;
 
   const GovtSidebar({super.key, required this.selectedIndex, required this.onItemSelected});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       width: 260,
       color: AppColors.sidebar,
@@ -339,7 +341,7 @@ class GovtSidebar extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.all(16),
             child: InkWell(
-              onTap: () => context.go('/'),
+              onTap: () => ref.read(authProvider.notifier).logout(),
               borderRadius: BorderRadius.circular(12),
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
