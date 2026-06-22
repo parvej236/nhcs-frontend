@@ -91,6 +91,7 @@ class LandingPage extends ConsumerWidget {
           ),
         ],
       ),
+      ),
     );
   }
 
