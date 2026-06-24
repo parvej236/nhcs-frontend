@@ -4,6 +4,8 @@ import '../models/health_event.dart';
 import '../models/medical_record.dart';
 import '../models/patient_profile.dart';
 import '../datasources/patient_mock_datasource.dart';
+import '../../../../core/network/api_client.dart';
+import 'package:dio/dio.dart';
 
 abstract class PatientRepository {
   Future<DashboardSummary> getDashboardSummary(String healthId);
@@ -28,6 +30,9 @@ abstract class PatientRepository {
 
 class PatientRepositoryImpl implements PatientRepository {
   final _datasource = PatientMockDatasource();
+  final ApiClient _apiClient;
+
+  PatientRepositoryImpl(this._apiClient);
 
   // Simulate network latency
   Future<void> _delay() => Future.delayed(const Duration(milliseconds: 600));
@@ -46,15 +51,74 @@ class PatientRepositoryImpl implements PatientRepository {
 
   @override
   Future<PatientProfile> getPatientProfile(String healthId) async {
-    await _delay();
-    return _datasource.profile;
+    try {
+      final response = await _apiClient.dio.get('/patients/me');
+      return _mapBackendPatientToProfile(response.data);
+    } catch (e) {
+      print('Error fetching profile from backend: $e. Falling back to mock.');
+      await _delay();
+      return _datasource.profile;
+    }
   }
 
   @override
   Future<PatientProfile> updatePatientProfile(String healthId, PatientProfile profile) async {
-    await _delay();
-    _datasource.profile = profile;
-    return _datasource.profile;
+    try {
+      final data = {
+        'fullName': profile.name,
+        'dateOfBirth': profile.dateOfBirth.toIso8601String().split('T')[0],
+        'gender': profile.gender,
+        'bloodGroup': profile.bloodGroup,
+        'contactNumber': profile.phone,
+        'occupation': profile.occupation,
+        'maritalStatus': profile.maritalStatus,
+        'presentAddress': profile.presentAddress,
+        'permanentAddress': profile.permanentAddress,
+        'emergencyContactName': profile.emergencyContacts.isNotEmpty ? profile.emergencyContacts.first.name : null,
+        'emergencyContactRelation': profile.emergencyContacts.isNotEmpty ? profile.emergencyContacts.first.relationship : null,
+        'emergencyContactPhone': profile.emergencyContacts.isNotEmpty ? profile.emergencyContacts.first.phone : null,
+      };
+      
+      final response = await _apiClient.dio.put('/patients/me', data: data);
+      final updatedProfile = _mapBackendPatientToProfile(response.data);
+      // Update mock data for consistency in other mock methods
+      _datasource.profile = updatedProfile;
+      return updatedProfile;
+    } catch (e) {
+      throw Exception('Failed to update profile: $e');
+    }
+  }
+
+  PatientProfile _mapBackendPatientToProfile(Map<String, dynamic> data) {
+    // Merge backend data with mock data to preserve vitals/history which aren't in backend yet
+    final mock = _datasource.profile;
+    
+    List<EmergencyContact> contacts = [];
+    if (data['emergencyContactName'] != null) {
+      contacts.add(EmergencyContact(
+        name: data['emergencyContactName'],
+        relationship: data['emergencyContactRelation'] ?? '',
+        phone: data['emergencyContactPhone'] ?? '',
+      ));
+    }
+
+    return PatientProfile(
+      healthId: mock.healthId,
+      name: data['fullName'] ?? mock.name,
+      dateOfBirth: data['dateOfBirth'] != null ? DateTime.parse(data['dateOfBirth']) : mock.dateOfBirth,
+      gender: data['gender'] ?? mock.gender,
+      bloodGroup: data['bloodGroup'] ?? mock.bloodGroup,
+      nationalId: mock.nationalId,
+      phone: data['contactNumber'] ?? mock.phone,
+      occupation: data['occupation'] ?? mock.occupation,
+      maritalStatus: data['maritalStatus'] ?? mock.maritalStatus,
+      presentAddress: data['presentAddress'] ?? mock.presentAddress,
+      permanentAddress: data['permanentAddress'] ?? mock.permanentAddress,
+      emergencyContacts: contacts.isNotEmpty ? contacts : mock.emergencyContacts,
+      allergies: mock.allergies,
+      chronicDiseases: mock.chronicDiseases,
+      vitals: mock.vitals,
+    );
   }
 
   @override
