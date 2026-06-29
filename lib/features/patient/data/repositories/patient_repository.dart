@@ -5,6 +5,7 @@ import '../models/dashboard_summary.dart';
 import '../models/health_event.dart';
 import '../models/medical_record.dart';
 import '../models/patient_profile.dart';
+import '../models/ai_suggestion.dart';
 
 abstract class PatientRepository {
   Future<DashboardSummary> getDashboardSummary(String healthId);
@@ -25,6 +26,7 @@ abstract class PatientRepository {
   Future<List<LabReport>> getLabReports(String healthId);
   Future<List<ImagingReport>> getImagingReports(String healthId);
   Future<void> cancelAppointment(String appointmentId);
+  Future<AiSuggestionResponse> getAiDoctorSuggestion(String healthId, String problemText);
 }
 
 class PatientRepositoryImpl implements PatientRepository {
@@ -134,6 +136,15 @@ class PatientRepositoryImpl implements PatientRepository {
   @override
   Future<void> cancelAppointment(String appointmentId) async {
     await dio.post(ApiEndpoints.cancelAppointment(appointmentId));
+  }
+
+  @override
+  Future<AiSuggestionResponse> getAiDoctorSuggestion(String healthId, String problemText) async {
+    final response = await dio.post(
+      '/patients/ai-suggest',
+      data: {'problemText': problemText},
+    );
+    return AiSuggestionResponse.fromJson(response.data as Map<String, dynamic>);
   }
 }
 

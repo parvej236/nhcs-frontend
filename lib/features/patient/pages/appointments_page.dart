@@ -5,6 +5,8 @@ import '../../../core/theme/app_colors.dart';
 import '../data/models/appointment.dart';
 import '../presentation/providers/booking_provider.dart';
 import '../presentation/providers/patient_providers.dart';
+import '../presentation/providers/ai_suggestion_provider.dart';
+import '../data/models/ai_suggestion.dart';
 
 class AppointmentsPage extends ConsumerStatefulWidget {
   const AppointmentsPage({super.key});
@@ -17,9 +19,22 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
   String _activeTab = 'Upcoming';
   String _searchQuery = '';
   String _specializationFilter = 'All Specializations';
+  final TextEditingController _symptomController = TextEditingController();
+
+  @override
+  void dispose() {
+    _symptomController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<AiSuggestionState>(aiSuggestionProvider, (previous, next) {
+      if (next.speechText != previous?.speechText && _symptomController.text != next.speechText) {
+        _symptomController.text = next.speechText;
+      }
+    });
+
     final appointmentsState = ref.watch(patientAppointmentsProvider);
     final bookingState = ref.watch(bookingProvider);
 
@@ -93,6 +108,9 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
                       );
                     },
                   ),
+                  const SizedBox(height: 48),
+
+                  _buildAiSmartBookingAssistant(),
                   const SizedBox(height: 48),
 
                   // Find Doctor Section
@@ -385,6 +403,616 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
       return months[month - 1];
     }
     return '';
+  }
+
+  Widget _buildAiSmartBookingAssistant() {
+    final aiState = ref.watch(aiSuggestionProvider);
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: AppColors.primary.withOpacity(0.15),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withOpacity(0.04),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header Badge & Title
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF8B5CF6), AppColors.primary],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.auto_awesome, color: Colors.white, size: 14),
+                    const SizedBox(width: 6),
+                    Text(
+                      'AI Smart Booking',
+                      style: GoogleFonts.inter(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'AI-Powered Appointment Assistant',
+                  style: GoogleFonts.outfit(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Describe your medical symptoms in Bangla or English, or use voice input. The AI will analyze your condition, summarize your symptoms, recommend the proper specialist, and locate the nearest hospitals and doctors.',
+            style: GoogleFonts.inter(
+              color: AppColors.textSecondary,
+              fontSize: 13.5,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // Search Field & Speech Controls
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _symptomController,
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    hintText: aiState.isListening
+                        ? 'আমি শুনছি, বলুন... (উদা: আমার মাথা ব্যাথ ও বমি বমি ভাব)'
+                        : 'আপনার সমস্যাটি বিস্তারিত লিখুন বা বলুন (উদা: কয়েক দিন ধরে বুকে ব্যথা ও শ্বাসকষ্ট)...',
+                    hintStyle: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 13.5),
+                    fillColor: AppColors.background,
+                    filled: true,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppColors.divider),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppColors.divider),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                    ),
+                    contentPadding: const EdgeInsets.all(16),
+                  ),
+                  style: GoogleFonts.inter(fontSize: 14, color: AppColors.textPrimary),
+                  onChanged: (val) {
+                    ref.read(aiSuggestionProvider.notifier).updateSpeechText(val);
+                  },
+                ),
+              ),
+              const SizedBox(width: 16),
+              Column(
+                children: [
+                  // Speech recognition button
+                  Tooltip(
+                    message: aiState.isListening ? 'Stop Listening' : 'Speak in Bangla',
+                    child: InkWell(
+                      onTap: () {
+                        if (aiState.isListening) {
+                          ref.read(aiSuggestionProvider.notifier).stopListening();
+                        } else {
+                          ref.read(aiSuggestionProvider.notifier).startListening();
+                        }
+                      },
+                      borderRadius: BorderRadius.circular(50),
+                      child: Container(
+                        height: 56,
+                        width: 56,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: aiState.isListening
+                              ? AppColors.danger.withOpacity(0.1)
+                              : AppColors.primaryLight,
+                          border: Border.all(
+                            color: aiState.isListening ? AppColors.danger : AppColors.primary,
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Icon(
+                          aiState.isListening ? Icons.mic_off_rounded : Icons.mic_rounded,
+                          color: aiState.isListening ? AppColors.danger : AppColors.primary,
+                          size: 24,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // Clear button
+                  TextButton(
+                    onPressed: () {
+                      _symptomController.clear();
+                      ref.read(aiSuggestionProvider.notifier).reset();
+                    },
+                    child: Text(
+                      'Clear',
+                      style: GoogleFonts.inter(
+                        color: AppColors.textSecondary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          
+          if (aiState.isListening) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.danger),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Listening... Speak in Bangla (বাংলায় বলুন)',
+                  style: GoogleFonts.inter(
+                    color: AppColors.danger,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ],
+
+          const SizedBox(height: 16),
+
+          // Primary Submit Button
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton.icon(
+              onPressed: aiState.isLoading || aiState.speechText.trim().isEmpty || aiState.isListening
+                  ? null
+                  : () {
+                      ref.read(aiSuggestionProvider.notifier).getSuggestion(_symptomController.text);
+                    },
+              icon: aiState.isLoading
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Icon(Icons.auto_awesome, size: 18),
+              label: Text(
+                aiState.isLoading ? 'AI Analyzing Symptoms...' : 'Analyze Symptoms with AI',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                disabledBackgroundColor: AppColors.divider,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
+
+          if (aiState.errorMessage != null) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.dangerLight,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.error_outline, color: AppColors.danger, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      aiState.errorMessage!,
+                      style: GoogleFonts.inter(color: AppColors.danger, fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          // AI Suggestion Result Display
+          if (aiState.suggestion != null) ...[
+            const SizedBox(height: 24),
+            const Divider(),
+            const SizedBox(height: 16),
+            _buildAiResultsSection(aiState.suggestion!),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAiResultsSection(AiSuggestionResponse suggestion) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // AI Health Summary
+        Row(
+          children: [
+            const Icon(Icons.description_outlined, color: AppColors.primary, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              'AI Health Summary (স্বাস্থ্য সারসংক্ষেপ):',
+              style: GoogleFonts.outfit(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.primaryLight.withOpacity(0.3),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.primary.withOpacity(0.1)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'English Summary:',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                suggestion.summaryEn,
+                style: GoogleFonts.inter(
+                  fontSize: 13.5,
+                  color: AppColors.textPrimary,
+                  height: 1.45,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'বাংলা সারসংক্ষেপ:',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                suggestion.summaryBn,
+                style: GoogleFonts.inter(
+                  fontSize: 13.5,
+                  color: AppColors.textPrimary,
+                  height: 1.45,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        // Estimated Specialization
+        Row(
+          children: [
+            const Icon(Icons.category_outlined, color: AppColors.primary, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              'Recommended Specialization:',
+              style: GoogleFonts.outfit(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const Spacer(),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                suggestion.specialization,
+                style: GoogleFonts.inter(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 24),
+
+        // Suggested Hospitals (Proximity Aware)
+        Row(
+          children: [
+            const Icon(Icons.location_on_rounded, color: AppColors.primary, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              'Nearby Matching Hospitals:',
+              style: GoogleFonts.outfit(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        ListView.separated(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: suggestion.suggestedHospitals.length,
+          separatorBuilder: (context, index) => const SizedBox(height: 10),
+          itemBuilder: (context, index) {
+            final hospital = suggestion.suggestedHospitals[index];
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: AppColors.background,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.divider),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.local_hospital_rounded, color: AppColors.primary, size: 20),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          hospital.name,
+                          style: GoogleFonts.inter(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13.5,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          hospital.address,
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryLight,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      hospital.distance,
+                      style: GoogleFonts.inter(
+                        color: AppColors.primary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+
+        const SizedBox(height: 24),
+
+        // Recommended Doctors
+        Row(
+          children: [
+            const Icon(Icons.people_outline_rounded, color: AppColors.primary, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              'Recommended Doctors:',
+              style: GoogleFonts.outfit(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (suggestion.suggestedDoctors.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            child: Text(
+              'No matching doctors found for this specialization.',
+              style: GoogleFonts.inter(color: AppColors.textSecondary, fontStyle: FontStyle.italic),
+            ),
+          )
+        else
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
+              childAspectRatio: 2.1,
+            ),
+            itemCount: suggestion.suggestedDoctors.length,
+            itemBuilder: (context, index) {
+              final doc = suggestion.suggestedDoctors[index];
+              return Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.divider),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.02),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 28,
+                      backgroundColor: AppColors.primary.withOpacity(0.1),
+                      backgroundImage: doc.imageUrl.isNotEmpty ? NetworkImage(doc.imageUrl) : null,
+                      child: doc.imageUrl.isEmpty
+                          ? const Icon(Icons.person, size: 28, color: AppColors.primary)
+                          : null,
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            doc.name,
+                            style: GoogleFonts.inter(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: AppColors.textPrimary,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            doc.specialization,
+                            style: GoogleFonts.inter(
+                              fontSize: 11.5,
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            doc.hospital,
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              color: AppColors.textMuted,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              const Icon(Icons.star_rounded, color: Colors.orange, size: 14),
+                              const SizedBox(width: 2),
+                              Text(
+                                doc.rating.toString(),
+                                style: GoogleFonts.inter(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '${doc.experienceYears} Yrs Exp',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          '৳${doc.consultationFee}',
+                          style: GoogleFonts.inter(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        ElevatedButton(
+                          onPressed: () => _openBookingDialog(doc),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: Text(
+                            'Book Slot',
+                            style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+      ],
+    );
   }
 }
 
