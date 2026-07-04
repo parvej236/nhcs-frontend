@@ -9,7 +9,6 @@ import '../../features/patient/presentation/providers/booking_provider.dart';
 import '../../features/doctor/presentation/providers/doctor_providers.dart';
 import '../../features/doctor/presentation/providers/clinical_workspace_provider.dart';
 import '../../features/hospital/presentation/providers/hospital_providers.dart';
-import '../../features/government/presentation/providers/govt_providers.dart';
 import 'notifications_provider.dart';
 
 class AuthState {
@@ -135,20 +134,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
     ref.invalidate(bedCapacityProvider);
     ref.invalidate(pharmacyInventoryProvider);
 
-    // Invalidate government providers
-    ref.invalidate(govtNavigationProvider);
-    ref.invalidate(govtDashboardStatsProvider);
-    ref.invalidate(govtCitizenRegistryProvider);
-    ref.invalidate(govtDoctorRegistryProvider);
-    ref.invalidate(govtHospitalRegistryProvider);
-    ref.invalidate(govtResourcesProvider);
-    ref.invalidate(govtAuditLogsProvider);
-
     // Invalidate notification providers
     ref.invalidate(patientNotificationsProvider);
     ref.invalidate(doctorNotificationsProvider);
     ref.invalidate(hospitalNotificationsProvider);
-    ref.invalidate(govtNotificationsProvider);
   }
 
   Future<void> switchRole(String newRole) async {

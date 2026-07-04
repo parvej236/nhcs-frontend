@@ -82,6 +82,14 @@ class Appointment {
   final String hospital;
   final String queueNumber;
   final String status; // Upcoming, Past, Cancelled
+  final String approvalStatus; // PENDING, APPROVED, REJECTED
+  final String arrivalStatus; // AWAITING, CHECKED_IN, COMPLETED
+  final String patientName;
+  final String patientHealthId;
+  final String patientNid;
+  final String patientAge;
+  final String patientGender;
+  final String patientBloodGroup;
 
   Appointment({
     required this.id,
@@ -91,9 +99,23 @@ class Appointment {
     required this.hospital,
     required this.queueNumber,
     required this.status,
+    this.approvalStatus = 'APPROVED',
+    this.arrivalStatus = 'AWAITING',
+    this.patientName = 'Rahim Islam',
+    this.patientHealthId = 'NUD-000-1',
+    this.patientNid = '',
+    this.patientAge = '40',
+    this.patientGender = 'Male',
+    this.patientBloodGroup = 'O+',
   });
 
   factory Appointment.fromJson(Map<String, dynamic> json) {
+    final patientJson = json['patient'] as Map<String, dynamic>?;
+    final patientId = patientJson?['id']?.toString() ?? '1';
+    final dobStr = patientJson?['dateOfBirth'] as String?;
+    final dob = dobStr != null ? DateTime.tryParse(dobStr) : null;
+    final age = dob != null ? (DateTime.now().year - dob.year).toString() : '40';
+
     return Appointment(
       id: json['id'] as String? ?? '',
       doctor: DoctorSpecialist.fromJson(json['doctor'] as Map<String, dynamic>),
@@ -102,6 +124,14 @@ class Appointment {
       hospital: json['hospital'] as String? ?? json['hospitalName'] as String? ?? '',
       queueNumber: json['queueNumber'] as String? ?? '',
       status: json['status'] as String? ?? 'Upcoming',
+      approvalStatus: json['approvalStatus'] as String? ?? 'PENDING',
+      arrivalStatus: json['arrivalStatus'] as String? ?? 'AWAITING',
+      patientName: patientJson?['fullName'] as String? ?? 'Rahim Islam',
+      patientHealthId: 'NUD-000-$patientId',
+      patientNid: patientJson?['nationalId'] as String? ?? '',
+      patientAge: age,
+      patientGender: patientJson?['gender'] as String? ?? 'Male',
+      patientBloodGroup: patientJson?['bloodGroup'] as String? ?? 'O+',
     );
   }
 
@@ -114,6 +144,14 @@ class Appointment {
       'hospital': hospital,
       'queueNumber': queueNumber,
       'status': status,
+      'approvalStatus': approvalStatus,
+      'arrivalStatus': arrivalStatus,
+      'patientName': patientName,
+      'patientHealthId': patientHealthId,
+      'patientNid': patientNid,
+      'patientAge': patientAge,
+      'patientGender': patientGender,
+      'patientBloodGroup': patientBloodGroup,
     };
   }
 }

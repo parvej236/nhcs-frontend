@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
+import 'package:uhcs/features/patient/data/models/appointment.dart';
 import '../../data/models/hospital_dashboard_stats.dart';
 import '../../data/models/reception_queue_item.dart';
 import '../../data/models/staff_member.dart';
@@ -222,4 +223,47 @@ class PharmacyInventoryNotifier extends StateNotifier<List<PharmacyItem>> {
 final pharmacyInventoryProvider = StateNotifierProvider<PharmacyInventoryNotifier, List<PharmacyItem>>((ref) {
   final repo = ref.watch(hospitalRepositoryProvider);
   return PharmacyInventoryNotifier(repo, ref);
+});
+
+class PendingAppointmentsNotifier extends StateNotifier<AsyncValue<List<Appointment>>> {
+  final HospitalRepository _repository;
+
+  PendingAppointmentsNotifier(this._repository) : super(const AsyncValue.loading()) {
+    loadPending();
+  }
+
+  Future<void> loadPending() async {
+    state = const AsyncValue.loading();
+    try {
+      final list = await _repository.getPendingAppointments();
+      state = AsyncValue.data(list);
+    } catch (e, stack) {
+      state = AsyncValue.error(e, stack);
+    }
+  }
+
+  Future<bool> approveAppointment(String id) async {
+    try {
+      await _repository.approveAppointment(id);
+      await loadPending();
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> rejectAppointment(String id) async {
+    try {
+      await _repository.rejectAppointment(id);
+      await loadPending();
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+}
+
+final pendingAppointmentsProvider = StateNotifierProvider<PendingAppointmentsNotifier, AsyncValue<List<Appointment>>>((ref) {
+  final repo = ref.watch(hospitalRepositoryProvider);
+  return PendingAppointmentsNotifier(repo);
 });

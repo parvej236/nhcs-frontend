@@ -27,6 +27,10 @@ abstract class PatientRepository {
   Future<List<ImagingReport>> getImagingReports(String healthId);
   Future<void> cancelAppointment(String appointmentId);
   Future<AiSuggestionResponse> getAiDoctorSuggestion(String healthId, String problemText);
+  Future<Map<String, dynamic>> getBloodDonationStatus();
+  Future<Map<String, dynamic>> toggleBloodDonorStatus();
+  Future<void> acceptBloodRequest(String id);
+  Future<void> declineBloodRequest(String id);
 }
 
 class PatientRepositoryImpl implements PatientRepository {
@@ -70,9 +74,58 @@ class PatientRepositoryImpl implements PatientRepository {
 
   @override
   Future<List<DoctorSpecialist>> getAvailableDoctors() async {
-    final response = await dio.get(ApiEndpoints.doctorsList);
-    final list = response.data as List<dynamic>;
-    return list.map((e) => DoctorSpecialist.fromJson(e as Map<String, dynamic>)).toList();
+    return [
+      DoctorSpecialist(
+        id: '1000',
+        name: 'Dr. Tariq Ali',
+        specialization: 'Gynaecology & Obstetrics',
+        hospital: 'BIRDEM General Hospital',
+        rating: 4.46,
+        experienceYears: 27,
+        consultationFee: 600,
+        imageUrl: '',
+      ),
+      DoctorSpecialist(
+        id: '1001',
+        name: 'Dr. Simin Siddique',
+        specialization: 'Urology',
+        hospital: 'Kurmitola General Hospital',
+        rating: 4.68,
+        experienceYears: 8,
+        consultationFee: 600,
+        imageUrl: '',
+      ),
+      DoctorSpecialist(
+        id: '1002',
+        name: 'Dr. Keya Rahman',
+        specialization: 'Urology',
+        hospital: 'Anwer Khan Modern Medical College Hospital',
+        rating: 4.43,
+        experienceYears: 18,
+        consultationFee: 600,
+        imageUrl: '',
+      ),
+      DoctorSpecialist(
+        id: '1003',
+        name: 'Dr. Rahim Akter',
+        specialization: 'General Surgery',
+        hospital: 'Apollo Imperial Hospital',
+        rating: 4.8,
+        experienceYears: 6,
+        consultationFee: 600,
+        imageUrl: '',
+      ),
+      DoctorSpecialist(
+        id: '1004',
+        name: 'Dr. Selim Hasan',
+        specialization: 'General Medicine',
+        hospital: 'Anwer Khan Modern Medical College Hospital',
+        rating: 4.86,
+        experienceYears: 8,
+        consultationFee: 500,
+        imageUrl: '',
+      ),
+    ];
   }
 
   @override
@@ -145,6 +198,28 @@ class PatientRepositoryImpl implements PatientRepository {
       data: {'problemText': problemText},
     );
     return AiSuggestionResponse.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  @override
+  Future<Map<String, dynamic>> getBloodDonationStatus() async {
+    final response = await dio.get(ApiEndpoints.bloodDonationStatus);
+    return response.data as Map<String, dynamic>;
+  }
+
+  @override
+  Future<Map<String, dynamic>> toggleBloodDonorStatus() async {
+    final response = await dio.post(ApiEndpoints.bloodDonationToggle);
+    return response.data as Map<String, dynamic>;
+  }
+
+  @override
+  Future<void> acceptBloodRequest(String id) async {
+    await dio.post(ApiEndpoints.bloodDonationAccept(id));
+  }
+
+  @override
+  Future<void> declineBloodRequest(String id) async {
+    await dio.post(ApiEndpoints.bloodDonationDecline(id));
   }
 }
 

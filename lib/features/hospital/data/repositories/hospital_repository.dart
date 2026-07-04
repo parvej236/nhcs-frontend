@@ -1,4 +1,8 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/providers/dio_provider.dart';
+import '../../../../core/network/api_endpoints.dart';
+import 'package:uhcs/features/patient/data/models/appointment.dart';
 import '../datasources/hospital_mock_datasource.dart';
 import '../models/hospital_dashboard_stats.dart';
 import '../models/reception_queue_item.dart';
@@ -10,6 +14,10 @@ import '../models/pharmacy_item.dart';
 abstract class HospitalRepository {
   Future<HospitalDashboardStats> getDashboardStats();
   Future<List<ReceptionQueueItem>> getReceptionQueue();
+  Future<List<Appointment>> getPendingAppointments();
+  Future<List<Appointment>> searchAppointments(String query);
+  Future<void> approveAppointment(String id);
+  Future<void> rejectAppointment(String id);
   Future<List<StaffMember>> getStaffMembers();
   Future<List<DoctorVerificationRequest>> getDoctorVerificationRequests();
   Future<List<LabTestOrder>> getLabTestOrders();
@@ -29,9 +37,10 @@ abstract class HospitalRepository {
 }
 
 class HospitalRepositoryImpl implements HospitalRepository {
-  final HospitalMockDatasource _datasource;
+  final Dio dio;
+  final HospitalMockDatasource _datasource = HospitalMockDatasource();
 
-  HospitalRepositoryImpl(this._datasource);
+  HospitalRepositoryImpl(this.dio);
 
   @override
   Future<void> addStaffMember(StaffMember staff) async {
@@ -40,12 +49,94 @@ class HospitalRepositoryImpl implements HospitalRepository {
 
   @override
   Future<HospitalDashboardStats> getDashboardStats() async {
-    return _datasource.dashboardStats;
+    try {
+      final response = await dio.get(ApiEndpoints.hospitalDashboardOverview);
+      final data = response.data as Map<String, dynamic>;
+      
+      final alertsJson = data['alerts'] as List<dynamic>? ?? [];
+      final alerts = alertsJson.map((a) => OperationalAlert(
+        id: a['id']?.toString() ?? '',
+        title: a['title']?.toString() ?? '',
+        description: a['description']?.toString() ?? '',
+        timeAgo: a['timeAgo']?.toString() ?? '',
+        type: a['type']?.toString() ?? 'info',
+      )).toList();
+
+      final deptLoadsJson = data['departmentLoads'] as List<dynamic>? ?? [];
+      final deptLoads = deptLoadsJson.map((d) => DepartmentLoad(
+        name: d['name']?.toString() ?? '',
+        patients: d['patients'] as int? ?? 0,
+        staff: d['staff'] as int? ?? 0,
+        load: d['load']?.toString() ?? 'Normal',
+      )).toList();
+
+      return HospitalDashboardStats(
+        activePatients: data['activePatients'] as int? ?? 0,
+        bedOccupancyRate: (data['bedOccupancyRate'] as num?)?.toDouble() ?? 0.0,
+        totalBeds: data['totalBeds'] as int? ?? 0,
+        occupiedBeds: data['occupiedBeds'] as int? ?? 0,
+        onDutyStaff: data['onDutyStaff'] as int? ?? 0,
+        onDutyDoctors: data['onDutyDoctors'] as int? ?? 0,
+        onDutyNurses: data['onDutyNurses'] as int? ?? 0,
+        emergencyIntake: data['emergencyIntake'] as int? ?? 0,
+        criticalCases: data['criticalCases'] as int? ?? 0,
+        alerts: alerts,
+        departmentLoads: deptLoads,
+      );
+    } catch (e) {
+      return _datasource.dashboardStats;
+    }
   }
 
   @override
   Future<List<ReceptionQueueItem>> getReceptionQueue() async {
-    return _datasource.receptionQueue;
+    try {
+      final response = await dio.get('/hospitals/reception/queue');
+      final data = response.data as List<dynamic>;
+      return data.map((item) => ReceptionQueueItem(
+        queueNo: item['queueNo']?.toString() ?? '',
+        name: item['name']?.toString() ?? '',
+        age: item['age']?.toString() ?? '40',
+        gender: item['gender']?.toString() ?? 'M',
+        dept: item['dept']?.toString() ?? '',
+        doctor: item['doctor']?.toString() ?? '',
+        status: item['status']?.toString() ?? 'Waiting',
+      )).toList();
+    } catch (e) {
+      return _datasource.receptionQueue;
+    }
+  }
+
+  @override
+  Future<List<Appointment>> getPendingAppointments() async {
+    try {
+      final response = await dio.get(ApiEndpoints.hospitalPendingAppointments);
+      final list = response.data as List<dynamic>;
+      return list.map((e) => Appointment.fromJson(e as Map<String, dynamic>)).toList();
+    } catch (e) {
+      return [];
+    }
+  }
+
+  @override
+  Future<void> approveAppointment(String id) async {
+    await dio.put(ApiEndpoints.hospitalApproveAppointment(id));
+  }
+
+  @override
+  Future<void> rejectAppointment(String id) async {
+    await dio.put(ApiEndpoints.hospitalRejectAppointment(id));
+  }
+
+  @override
+  Future<List<Appointment>> searchAppointments(String query) async {
+    try {
+      final response = await dio.get(ApiEndpoints.hospitalSearchAppointments(query));
+      final list = response.data as List<dynamic>;
+      return list.map((e) => Appointment.fromJson(e as Map<String, dynamic>)).toList();
+    } catch (e) {
+      return [];
+    }
   }
 
   @override
@@ -80,30 +171,34 @@ class HospitalRepositoryImpl implements HospitalRepository {
 
   @override
   Future<void> checkInPatient(String name, String age, String gender, String healthId, String dept, String doctor) async {
-    final String prefix = dept == 'Emergency' ? 'EM' : 'CD';
-    final int nextNo = _datasource.receptionQueue.where((p) => p.dept == dept).length + 1;
-    final newItem = ReceptionQueueItem(
-      queueNo: '$prefix-${nextNo.toString().padLeft(2, '0')}',
-      name: name,
-      age: age,
-      gender: gender,
-      dept: dept,
-      doctor: doctor,
-      status: 'Waiting',
-    );
-    _datasource.receptionQueue.add(newItem);
-    
-    // Increment active patients stats
-    _datasource.dashboardStats = _datasource.dashboardStats.copyWith(
-      activePatients: _datasource.dashboardStats.activePatients + 1,
-    );
+    try {
+      await dio.put('/hospitals/appointments/check-in-by-patient', queryParameters: {'healthId': healthId});
+    } catch (e) {
+      // Fallback to local datasource if API fails or doesn't exist
+      final String prefix = dept == 'Emergency' ? 'EM' : 'CD';
+      final int nextNo = _datasource.receptionQueue.where((p) => p.dept == dept).length + 1;
+      final newItem = ReceptionQueueItem(
+        queueNo: '$prefix-${nextNo.toString().padLeft(2, '0')}',
+        name: name,
+        age: age,
+        gender: gender,
+        dept: dept,
+        doctor: doctor,
+        status: 'Waiting',
+      );
+      _datasource.receptionQueue.add(newItem);
+    }
   }
 
   @override
   Future<void> updateQueueStatus(String queueNo, String newStatus) async {
-    final idx = _datasource.receptionQueue.indexWhere((p) => p.queueNo == queueNo);
-    if (idx != -1) {
-      _datasource.receptionQueue[idx] = _datasource.receptionQueue[idx].copyWith(status: newStatus);
+    try {
+      await dio.put('/hospitals/reception/queue/$queueNo/status', queryParameters: {'status': newStatus});
+    } catch (e) {
+      final idx = _datasource.receptionQueue.indexWhere((p) => p.queueNo == queueNo);
+      if (idx != -1) {
+        _datasource.receptionQueue[idx] = _datasource.receptionQueue[idx].copyWith(status: newStatus);
+      }
     }
   }
 
@@ -122,24 +217,6 @@ class HospitalRepositoryImpl implements HospitalRepository {
     final idx = _datasource.verificationRequests.indexWhere((r) => r.id == requestId);
     if (idx != -1) {
       _datasource.verificationRequests[idx] = _datasource.verificationRequests[idx].copyWith(status: status);
-      if (status == 'Approved') {
-        final req = _datasource.verificationRequests[idx];
-        final newDoc = StaffMember(
-          id: 'S-00${_datasource.staffMembers.length + 1}',
-          name: req.name,
-          role: 'Doctor',
-          dept: req.specialization,
-          status: 'Active',
-          shifts: {'Monday': '8 AM - 2 PM'},
-        );
-        _datasource.staffMembers.add(newDoc);
-        
-        // Update stats
-        _datasource.dashboardStats = _datasource.dashboardStats.copyWith(
-          onDutyStaff: _datasource.dashboardStats.onDutyStaff + 1,
-          onDutyDoctors: _datasource.dashboardStats.onDutyDoctors + 1,
-        );
-      }
     }
   }
 
@@ -182,7 +259,6 @@ class HospitalRepositoryImpl implements HospitalRepository {
         doctor: doctor,
         days: 0,
       );
-      _datasource.updateOccupancyStats();
     }
   }
 
@@ -194,60 +270,16 @@ class HospitalRepositoryImpl implements HospitalRepository {
         status: 'Available',
         clearPatientData: true,
       );
-      _datasource.updateOccupancyStats();
     }
   }
 
   @override
   Future<bool> dispenseDrugs(String rxId) async {
-    final rx = _datasource.mockPrescriptions[rxId];
-    if (rx == null) return false;
-    final List items = rx['items'];
-
-    // Stock check
-    for (var item in items) {
-      final String medName = item['medicine'];
-      final int qty = item['qty'];
-      final idx = _datasource.pharmacyItems.indexWhere((i) => i.name == medName);
-      if (idx == -1 || _datasource.pharmacyItems[idx].stock < qty) {
-        return false;
-      }
-    }
-
-    // Deduct stock
-    for (var item in items) {
-      final String medName = item['medicine'];
-      final int qty = item['qty'];
-      final idx = _datasource.pharmacyItems.indexWhere((i) => i.name == medName);
-      if (idx != -1) {
-        final current = _datasource.pharmacyItems[idx];
-        _datasource.pharmacyItems[idx] = current.copyWith(stock: current.stock - qty);
-      }
-    }
-
-    // Check if low stock triggers alerts
-    final paracetamolLow = _datasource.pharmacyItems.firstWhere((i) => i.name.startsWith('Paracetamol')).stock < 1000;
-    
-    // Dynamic alerts list
-    final updatedAlerts = List<OperationalAlert>.from(_datasource.dashboardStats.alerts);
-    final paracetamolAlertIdx = updatedAlerts.indexWhere((a) => a.title == 'Medicine Shortage');
-    if (paracetamolLow && paracetamolAlertIdx == -1) {
-      updatedAlerts.add(OperationalAlert(
-        id: 'a4',
-        title: 'Medicine Shortage',
-        description: 'Paracetamol stock is critical.',
-        timeAgo: 'Just now',
-        type: 'warning',
-      ));
-    } else if (!paracetamolLow && paracetamolAlertIdx != -1) {
-      updatedAlerts.removeAt(paracetamolAlertIdx);
-    }
-    
-    _datasource.dashboardStats = _datasource.dashboardStats.copyWith(alerts: updatedAlerts);
     return true;
   }
 }
 
 final hospitalRepositoryProvider = Provider<HospitalRepository>((ref) {
-  return HospitalRepositoryImpl(HospitalMockDatasource());
+  final dio = ref.watch(dioProvider);
+  return HospitalRepositoryImpl(dio);
 });

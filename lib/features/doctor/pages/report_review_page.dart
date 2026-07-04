@@ -291,7 +291,7 @@ class _ReportReviewPageState extends ConsumerState<ReportReviewPage> {
                 OutlinedButton.icon(
                   onPressed: () {
                     // Start consultation directly from report review
-                    ref.read(clinicalWorkspaceProvider.notifier).initializePatient(report.healthId, report.patientName);
+                    ref.read(clinicalWorkspaceProvider.notifier).initializePatient('', report.healthId, report.patientName);
                     ref.read(doctorNavigationProvider.notifier).state = 1;
                   },
                   icon: const Icon(Icons.edit_note_rounded, size: 16),

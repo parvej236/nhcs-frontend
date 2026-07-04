@@ -19,18 +19,20 @@ class NotificationDropdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppColors.of(context);
     final unreadCount = notifications.where((n) => !n.isRead).length;
 
     return PopupMenuButton<String>(
       offset: const Offset(0, 48),
       position: PopupMenuPosition.under,
+      color: t.bgCard,
       icon: Stack(
         clipBehavior: Clip.none,
         children: [
           Container(
             padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.circular(10)),
-            child: const Icon(Icons.notifications_none_rounded, color: AppColors.textSecondary, size: 20),
+            decoration: BoxDecoration(color: t.bgInput, borderRadius: BorderRadius.circular(10)),
+            child: Icon(Icons.notifications_none_rounded, color: t.textSecondary, size: 20),
           ),
           if (unreadCount > 0)
             Positioned(
@@ -38,7 +40,7 @@ class NotificationDropdown extends StatelessWidget {
               top: 2,
               child: Container(
                 padding: const EdgeInsets.all(4),
-                decoration: const BoxDecoration(color: AppColors.danger, shape: BoxShape.circle),
+                decoration: BoxDecoration(color: t.danger, shape: BoxShape.circle),
                 constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
                 child: Text(
                   '$unreadCount',
@@ -50,9 +52,12 @@ class NotificationDropdown extends StatelessWidget {
         ],
       ),
       tooltip: 'Notifications',
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: t.border),
+      ),
       elevation: 6,
-      shadowColor: Colors.black.withOpacity(0.1),
+      shadowColor: Colors.black.withValues(alpha: t.isDark ? 0.25 : 0.05),
       constraints: const BoxConstraints(minWidth: 340, maxWidth: 340),
       itemBuilder: (context) {
         return [
@@ -61,7 +66,7 @@ class NotificationDropdown extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Notifications', style: GoogleFonts.outfit(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 16)),
+                Text('Notifications', style: GoogleFonts.outfit(color: t.textPrimary, fontWeight: FontWeight.bold, fontSize: 16)),
                 if (unreadCount > 0)
                   TextButton(
                     onPressed: () {
@@ -73,7 +78,7 @@ class NotificationDropdown extends StatelessWidget {
                       minimumSize: Size.zero,
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
-                    child: Text('Mark all as read', style: GoogleFonts.inter(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.bold)),
+                    child: Text('Mark all as read', style: GoogleFonts.inter(color: t.brandPrimary, fontSize: 12, fontWeight: FontWeight.bold)),
                   )
               ],
             ),
@@ -85,23 +90,23 @@ class NotificationDropdown extends StatelessWidget {
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 24),
                 child: Center(
-                  child: Text('No new alerts.', style: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 13)),
+                  child: Text('No new alerts.', style: GoogleFonts.inter(color: t.textSecondary, fontSize: 13)),
                 ),
               ),
             )
           else
             ...notifications.map((n) {
-              Color statusColor = AppColors.info;
-              Color bgLight = AppColors.infoLight;
+              Color statusColor = t.brandPrimary;
+              Color bgLight = t.brandPrimary.withValues(alpha: 0.1);
               if (n.type == 'danger') {
-                statusColor = AppColors.danger;
-                bgLight = AppColors.dangerLight;
+                statusColor = t.danger;
+                bgLight = t.danger.withValues(alpha: 0.1);
               } else if (n.type == 'warning') {
-                statusColor = AppColors.warning;
-                bgLight = AppColors.warningLight;
+                statusColor = t.warning;
+                bgLight = t.warning.withValues(alpha: 0.1);
               } else if (n.type == 'success') {
-                statusColor = AppColors.success;
-                bgLight = AppColors.successLight;
+                statusColor = t.success;
+                bgLight = t.success.withValues(alpha: 0.1);
               }
 
               return PopupMenuItem<String>(
@@ -113,7 +118,7 @@ class NotificationDropdown extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   decoration: BoxDecoration(
-                    color: n.isRead ? Colors.transparent : statusColor.withOpacity(0.04),
+                    color: n.isRead ? Colors.transparent : statusColor.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
@@ -143,7 +148,7 @@ class NotificationDropdown extends StatelessWidget {
                                     n.title,
                                     style: GoogleFonts.inter(
                                       fontWeight: n.isRead ? FontWeight.w500 : FontWeight.bold,
-                                      color: AppColors.textPrimary,
+                                      color: t.textPrimary,
                                       fontSize: 12,
                                     ),
                                     maxLines: 1,
@@ -154,19 +159,19 @@ class NotificationDropdown extends StatelessWidget {
                                   Container(
                                     width: 6,
                                     height: 6,
-                                    decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+                                    decoration: BoxDecoration(color: t.brandPrimary, shape: BoxShape.circle),
                                   ),
                               ],
                             ),
                             const SizedBox(height: 4),
                             Text(
                               n.description,
-                              style: GoogleFonts.inter(color: AppColors.textSecondary, fontSize: 11, height: 1.3),
+                              style: GoogleFonts.inter(color: t.textSecondary, fontSize: 11, height: 1.3),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 6),
-                            Text(n.timestamp, style: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 10)),
+                            Text(n.timestamp, style: GoogleFonts.inter(color: t.textSecondary.withValues(alpha: 0.6), fontSize: 10)),
                           ],
                         ),
                       ),

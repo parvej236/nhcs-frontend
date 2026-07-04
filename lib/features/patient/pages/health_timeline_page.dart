@@ -18,33 +18,42 @@ class _HealthTimelinePageState extends ConsumerState<HealthTimelinePage> {
   @override
   Widget build(BuildContext context) {
     final timelineState = ref.watch(patientTimelineProvider);
+    final t = AppColors.of(context);
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: t.bgMain,
       body: Column(
         children: [
           // Header
           Container(
             padding: const EdgeInsets.all(24),
-            color: AppColors.surface,
+            decoration: BoxDecoration(
+              color: t.bgCard,
+              border: Border(bottom: BorderSide(color: t.border)),
+            ),
             child: Row(
               children: [
-                Text('Health Timeline', style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold)),
+                Text(
+                  'Health Timeline',
+                  style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold, color: t.textPrimary),
+                ),
                 const Spacer(),
-                _filterChip('All'),
+                _filterChip(context, 'All'),
                 const SizedBox(width: 8),
-                _filterChip('Consultations'),
+                _filterChip(context, 'Consultations'),
                 const SizedBox(width: 8),
-                _filterChip('Lab Tests'),
+                _filterChip(context, 'Lab Tests'),
                 const SizedBox(width: 8),
-                _filterChip('Imaging'),
+                _filterChip(context, 'Imaging'),
               ],
             ),
           ),
           Expanded(
             child: timelineState.when(
-              loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
-              error: (err, stack) => Center(child: Text('Error loading timeline: $err')),
+              loading: () => Center(child: CircularProgressIndicator(color: t.brandPrimary)),
+              error: (err, stack) => Center(
+                child: Text('Error loading timeline: $err', style: TextStyle(color: t.textSecondary)),
+              ),
               data: (events) {
                 // Apply Filter
                 final filtered = events.where((e) {
@@ -60,9 +69,12 @@ class _HealthTimelinePageState extends ConsumerState<HealthTimelinePage> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.history_toggle_off_rounded, size: 48, color: AppColors.textMuted),
+                        Icon(Icons.history_toggle_off_rounded, size: 48, color: t.textSecondary.withValues(alpha: 0.5)),
                         const SizedBox(height: 16),
-                        Text('No matching health events found.', style: GoogleFonts.inter(color: AppColors.textSecondary)),
+                        Text(
+                          'No matching health events found.',
+                          style: GoogleFonts.inter(color: t.textSecondary),
+                        ),
                       ],
                     ),
                   );
@@ -87,14 +99,14 @@ class _HealthTimelinePageState extends ConsumerState<HealthTimelinePage> {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _yearLabel(year),
+                        _yearLabel(context, year),
                         ...yearEvents.asMap().entries.map((entry) {
                           final eventIndex = entry.key;
                           final event = entry.value;
                           final isFirst = eventIndex == 0;
                           final isLast = eventIndex == yearEvents.length - 1;
 
-                          return _buildTimelineItem(event, isFirst: isFirst, isLast: isLast);
+                          return _buildTimelineItem(context, event, isFirst: isFirst, isLast: isLast);
                         }),
                         const SizedBox(height: 16),
                       ],
@@ -109,7 +121,8 @@ class _HealthTimelinePageState extends ConsumerState<HealthTimelinePage> {
     );
   }
 
-  Widget _filterChip(String label) {
+  Widget _filterChip(BuildContext context, String label) {
+    final t = AppColors.of(context);
     final selected = _activeFilter == label;
     return InkWell(
       onTap: () {
@@ -121,39 +134,44 @@ class _HealthTimelinePageState extends ConsumerState<HealthTimelinePage> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: selected ? AppColors.primary : AppColors.background,
+          color: selected ? t.brandPrimary : t.bgInput,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: selected ? AppColors.primary : AppColors.divider),
+          border: Border.all(color: selected ? t.brandPrimary : t.border),
         ),
         child: Text(
           label,
           style: GoogleFonts.inter(
             fontSize: 13,
             fontWeight: FontWeight.w500,
-            color: selected ? Colors.white : AppColors.textSecondary,
+            color: selected ? Colors.white : t.textSecondary,
           ),
         ),
       ),
     );
   }
 
-  Widget _yearLabel(String year) {
+  Widget _yearLabel(BuildContext context, String year) {
+    final t = AppColors.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 16, top: 8),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
-          color: AppColors.primaryLight,
+          color: t.brandPrimary.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(8),
         ),
-        child: Text(year, style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.primary)),
+        child: Text(
+          year,
+          style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w700, color: t.brandPrimary),
+        ),
       ),
     );
   }
 
-  Widget _buildTimelineItem(HealthEvent event, {required bool isFirst, required bool isLast}) {
+  Widget _buildTimelineItem(BuildContext context, HealthEvent event, {required bool isFirst, required bool isLast}) {
+    final t = AppColors.of(context);
     final iconData = _getEventIcon(event.type);
-    final themeColor = _getEventColor(event.type);
+    final themeColor = _getEventColor(context, event.type);
     final dateStr = "${event.date.day} ${_getMonthName(event.date.month)} ${event.date.year}";
 
     return IntrinsicHeight(
@@ -165,17 +183,17 @@ class _HealthTimelinePageState extends ConsumerState<HealthTimelinePage> {
             width: 40,
             child: Column(
               children: [
-                if (!isFirst) Container(width: 2, height: 12, color: AppColors.divider),
+                if (!isFirst) Container(width: 2, height: 12, color: t.border),
                 Container(
                   padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
-                    color: themeColor.withOpacity(0.15),
+                    color: themeColor.withValues(alpha: 0.15),
                     shape: BoxShape.circle,
                     border: Border.all(color: themeColor, width: 2),
                   ),
                   child: Icon(iconData, size: 14, color: themeColor),
                 ),
-                if (!isLast) Expanded(child: Container(width: 2, color: AppColors.divider)),
+                if (!isLast) Expanded(child: Container(width: 2, color: t.border)),
               ],
             ),
           ),
@@ -186,27 +204,38 @@ class _HealthTimelinePageState extends ConsumerState<HealthTimelinePage> {
               margin: const EdgeInsets.only(bottom: 16),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: AppColors.surface,
+                color: t.bgCard,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.divider.withOpacity(0.5)),
+                border: Border.all(color: t.border),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      Expanded(child: Text(event.title, style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 15))),
-                      Text(dateStr, style: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 12)),
+                      Expanded(
+                        child: Text(
+                          event.title,
+                          style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 15, color: t.textPrimary),
+                        ),
+                      ),
+                      Text(dateStr, style: GoogleFonts.inter(color: t.textSecondary, fontSize: 12)),
                     ],
                   ),
                   const SizedBox(height: 6),
-                  Text(event.description, style: GoogleFonts.inter(color: AppColors.textSecondary, fontSize: 13, height: 1.5)),
+                  Text(
+                    event.description,
+                    style: GoogleFonts.inter(color: t.textSecondary, fontSize: 13, height: 1.5),
+                  ),
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      const Icon(Icons.location_on_outlined, size: 13, color: AppColors.textMuted),
+                      Icon(Icons.location_on_outlined, size: 13, color: t.textSecondary),
                       const SizedBox(width: 4),
-                      Text('${event.doctorName} • ${event.hospitalName}', style: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 12)),
+                      Text(
+                        '${event.doctorName} • ${event.hospitalName}',
+                        style: GoogleFonts.inter(color: t.textSecondary.withValues(alpha: 0.7), fontSize: 12),
+                      ),
                     ],
                   ),
                 ],
@@ -243,28 +272,29 @@ class _HealthTimelinePageState extends ConsumerState<HealthTimelinePage> {
     }
   }
 
-  Color _getEventColor(HealthEventType type) {
+  Color _getEventColor(BuildContext context, HealthEventType type) {
+    final t = AppColors.of(context);
     switch (type) {
       case HealthEventType.consultation:
-        return AppColors.primary;
+        return t.brandPrimary;
       case HealthEventType.labTest:
-        return AppColors.secondary;
+        return t.brandSecondary;
       case HealthEventType.imaging:
-        return AppColors.warning;
+        return t.warning;
       case HealthEventType.surgery:
-        return Colors.red;
+        return t.danger;
       case HealthEventType.admission:
-        return Colors.purple;
+        return const Color(0xFF8B5CF6); // purple
       case HealthEventType.discharge:
-        return Colors.blue;
+        return const Color(0xFF3B82F6); // blue
       case HealthEventType.vaccination:
-        return AppColors.success;
+        return t.success;
       case HealthEventType.prescription:
-        return Colors.teal;
+        return t.success;
       case HealthEventType.followUp:
-        return Colors.orange;
+        return t.warning;
       case HealthEventType.emergency:
-        return Colors.redAccent;
+        return t.danger;
     }
   }
 

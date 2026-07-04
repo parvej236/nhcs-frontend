@@ -4,14 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/auth_provider.dart';
 import 'route_guards.dart';
 
-import '../../features/auth/pages/landing_page.dart';
-import '../../features/auth/pages/role_selection_page.dart';
-import '../../features/auth/pages/login_page.dart';
+import '../../features/public/pages/public_shell.dart';
+import '../../features/public/pages/login_portal_page.dart';
 import '../../features/auth/pages/search_doctors_page.dart';
 import '../../features/patient/pages/patient_shell.dart';
 import '../../features/doctor/pages/doctor_shell.dart';
 import '../../features/hospital/pages/hospital_shell.dart';
-import '../../features/government/pages/govt_shell.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final notifier = ref.watch(authProvider.notifier);
@@ -26,22 +24,15 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(
         path: '/',
-        builder: (context, state) => const LandingPage(),
+        builder: (context, state) => const PublicShell(),
       ),
       GoRoute(
         path: '/search_doctors',
         builder: (context, state) => const SearchDoctorsPage(),
       ),
       GoRoute(
-        path: '/role',
-        builder: (context, state) => const RoleSelectionPage(),
-      ),
-      GoRoute(
         path: '/login',
-        builder: (context, state) {
-          final role = state.uri.queryParameters['role'];
-          return LoginPage(role: role);
-        },
+        builder: (context, state) => const LoginPortalPage(),
       ),
       GoRoute(
         path: '/user',
@@ -54,10 +45,6 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/authority',
         builder: (context, state) => const HospitalShell(),
-      ),
-      GoRoute(
-        path: '/government',
-        builder: (context, state) => const GovtShell(),
       ),
     ],
   );

@@ -175,7 +175,7 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
                                 if (profile == null) {
                                   return const Text('Patient profile not found.');
                                 }
-                                return _buildPatientHistoryContent(profile);
+                                return _buildPatientHistoryContent(profile, workspaceState);
                               },
                               loading: () => const Center(
                                 child: Padding(
@@ -264,11 +264,11 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
             onPressed: () {
               final id = _searchController.text.trim();
               if (id.isNotEmpty) {
-                ref.read(clinicalWorkspaceProvider.notifier).initializePatient(id, 'Patient Profile');
+                ref.read(clinicalWorkspaceProvider.notifier).initializePatient('', id, 'Patient Profile');
                 // Dynamically fetch patient details from datasource
                 ref.read(doctorRepositoryProvider).getPatientProfileByHealthId(id).then((p) {
                   if (p != null) {
-                    ref.read(clinicalWorkspaceProvider.notifier).initializePatient(id, p.name);
+                    ref.read(clinicalWorkspaceProvider.notifier).initializePatient('', id, p.name);
                   }
                 });
               }
@@ -280,10 +280,10 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
         onSubmitted: (value) {
           final id = value.trim();
           if (id.isNotEmpty) {
-            ref.read(clinicalWorkspaceProvider.notifier).initializePatient(id, 'Patient Profile');
+            ref.read(clinicalWorkspaceProvider.notifier).initializePatient('', id, 'Patient Profile');
             ref.read(doctorRepositoryProvider).getPatientProfileByHealthId(id).then((p) {
               if (p != null) {
-                ref.read(clinicalWorkspaceProvider.notifier).initializePatient(id, p.name);
+                ref.read(clinicalWorkspaceProvider.notifier).initializePatient('', id, p.name);
               }
             });
           }
@@ -322,7 +322,7 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
     );
   }
 
-  Widget _buildPatientHistoryContent(PatientProfile profile) {
+  Widget _buildPatientHistoryContent(PatientProfile profile, ClinicalWorkspaceState workspaceState) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -412,7 +412,7 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
         
         const SizedBox(height: 20),
         
-        // AI Clinical Overview Summary
+        // AI Clinical Overview Summary & Gemini Briefing Card
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -420,26 +420,96 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: AppColors.accent.withOpacity(0.2)),
           ),
-          child: Row(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(Icons.auto_awesome_rounded, color: AppColors.accent, size: 20),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.auto_awesome_rounded, color: AppColors.accent, size: 20),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('AI Clinical Overview', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.accent)),
+                        const SizedBox(height: 6),
+                        Text(
+                          profile.healthId == 'NUD-892-441-X7'
+                              ? 'Patient has been under treatment for diabetes for five years. Blood glucose levels have gradually increased during the last three visits. Medication compliance appears inconsistent. One follow-up appointment was missed.'
+                              : 'Patient profile loaded. Review current vital signs and allergy checklist before prescribing treatment.',
+                          style: GoogleFonts.inter(fontSize: 12, color: AppColors.textSecondary, height: 1.5),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              const Divider(color: AppColors.divider),
+              const SizedBox(height: 12),
+              if (workspaceState.aiBriefingText == null) ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('AI Clinical Overview', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.accent)),
-                    const SizedBox(height: 6),
                     Text(
-                      profile.healthId == 'NUD-892-441-X7'
-                          ? 'Patient has been under treatment for diabetes for five years. Blood glucose levels have gradually increased during the last three visits. Medication compliance appears inconsistent. One follow-up appointment was missed.'
-                          : 'Patient profile loaded. Review current vital signs and allergy checklist before prescribing treatment.',
-                      style: GoogleFonts.inter(fontSize: 12, color: AppColors.textSecondary, height: 1.5),
+                      'AI Medical History Briefing',
+                      style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: workspaceState.isGeneratingBriefing
+                          ? null
+                          : () {
+                              ref.read(clinicalWorkspaceProvider.notifier).generateBriefing();
+                            },
+                      icon: workspaceState.isGeneratingBriefing
+                          ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 1.5))
+                          : const Icon(Icons.psychology_rounded, size: 16),
+                      label: Text(workspaceState.isGeneratingBriefing ? 'Analyzing...' : 'Generate Briefing'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.accent,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
                     ),
                   ],
                 ),
-              ),
+              ] else ...[
+                Row(
+                  children: [
+                    const Icon(Icons.fact_check_rounded, color: AppColors.success, size: 16),
+                    const SizedBox(width: 8),
+                    Text(
+                      'AI Medical Briefing Generated',
+                      style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.success),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.refresh_rounded, size: 16),
+                      onPressed: () {
+                        ref.read(clinicalWorkspaceProvider.notifier).generateBriefing();
+                      },
+                      tooltip: 'Regenerate Briefing',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.divider),
+                  ),
+                  child: Text(
+                    workspaceState.aiBriefingText!,
+                    style: GoogleFonts.inter(fontSize: 12, color: AppColors.textPrimary, height: 1.6),
+                  ),
+                ),
+              ],
             ],
           ),
         ),

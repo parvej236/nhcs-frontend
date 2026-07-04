@@ -5,10 +5,9 @@ import '../providers/auth_provider.dart';
 
 class RouteGuards {
   static String? guardRoute(BuildContext context, GoRouterState state, AuthState authState) {
-    final isAuthPage = state.uri.path == '/login' || 
-                       state.uri.path == '/role' || 
+    final isAuthPage = state.uri.path == '/login' ||
                        state.uri.path.startsWith('/auth');
-    
+
     final isPublicPage = state.uri.path == '/' || state.uri.path == '/search_doctors';
 
     if (authState.isLoading) {
@@ -24,10 +23,8 @@ class RouteGuards {
           return '/doctor';
         case AppConstants.roleHospital:
           return '/authority';
-        case AppConstants.roleGovt:
-          return '/government';
         default:
-          return '/role';
+          return '/'; // No dedicated portal (e.g. admin) — fall back to public site
       }
     }
 
@@ -36,7 +33,7 @@ class RouteGuards {
       if (isAuthPage || isPublicPage) {
         return null; // Let them access public or auth pages
       }
-      return '/role'; // Force login funnel on protected access
+      return '/login'; // Force login funnel on protected access
     }
 
     // 2. Authenticated users flow
@@ -53,9 +50,6 @@ class RouteGuards {
       return getActiveDashboard(authState.role);
     }
     if (state.uri.path.startsWith('/authority') && authState.role != AppConstants.roleHospital) {
-      return getActiveDashboard(authState.role);
-    }
-    if (state.uri.path.startsWith('/government') && authState.role != AppConstants.roleGovt) {
       return getActiveDashboard(authState.role);
     }
 
