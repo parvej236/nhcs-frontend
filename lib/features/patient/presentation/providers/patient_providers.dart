@@ -131,3 +131,57 @@ final patientImagingReportsProvider = FutureProvider<List<ImagingReport>>((ref) 
 
 // 10. Navigation Selection Provider
 final patientNavigationProvider = StateProvider<int>((ref) => 0);
+
+// 11. Profile Sub-Tab Provider
+final patientProfileTabProvider = StateProvider<int>((ref) => 0);
+
+// 12. Blood Donation State Provider
+class BloodDonationNotifier extends StateNotifier<AsyncValue<Map<String, dynamic>>> {
+  final PatientRepository _repository;
+
+  BloodDonationNotifier(this._repository) : super(const AsyncValue.loading()) {
+    loadStatus();
+  }
+
+  Future<void> loadStatus() async {
+    state = const AsyncValue.loading();
+    try {
+      final status = await _repository.getBloodDonationStatus();
+      state = AsyncValue.data(status);
+    } catch (err, stack) {
+      state = AsyncValue.error(err, stack);
+    }
+  }
+
+  Future<void> toggleDonor() async {
+    try {
+      state = const AsyncValue.loading();
+      await _repository.toggleBloodDonorStatus();
+      final status = await _repository.getBloodDonationStatus();
+      state = AsyncValue.data(status);
+    } catch (err, stack) {
+      state = AsyncValue.error(err, stack);
+    }
+  }
+
+  Future<void> acceptRequest(String id) async {
+    try {
+      await _repository.acceptBloodRequest(id);
+      final status = await _repository.getBloodDonationStatus();
+      state = AsyncValue.data(status);
+    } catch (_) {}
+  }
+
+  Future<void> declineRequest(String id) async {
+    try {
+      await _repository.declineBloodRequest(id);
+      final status = await _repository.getBloodDonationStatus();
+      state = AsyncValue.data(status);
+    } catch (_) {}
+  }
+}
+
+final bloodDonationProvider = StateNotifierProvider<BloodDonationNotifier, AsyncValue<Map<String, dynamic>>>((ref) {
+  final repo = ref.read(patientRepositoryProvider);
+  return BloodDonationNotifier(repo);
+});

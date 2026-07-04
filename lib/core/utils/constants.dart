@@ -1,5 +1,5 @@
 class AppConstants {
-  static const String appName = 'NUDHEB';
+  static const String appName = 'NHCS';
   static const String appVersion = '1.0.0';
 
   // Network
@@ -17,5 +17,4 @@ class AppConstants {
   static const String rolePatient = 'PATIENT';
   static const String roleDoctor = 'DOCTOR';
   static const String roleHospital = 'HOSPITAL';
-  static const String roleGovt = 'GOVT';
 }

@@ -59,6 +59,7 @@ class PrescribedMedicine {
 }
 
 class TreatmentPlan {
+  final String appointmentId;
   final String patientId;
   final String patientName;
   final List<String> symptoms;
@@ -71,6 +72,7 @@ class TreatmentPlan {
   final DateTime date;
 
   TreatmentPlan({
+    this.appointmentId = '',
     required this.patientId,
     required this.patientName,
     required this.symptoms,
@@ -85,6 +87,7 @@ class TreatmentPlan {
 
   factory TreatmentPlan.fromJson(Map<String, dynamic> json) {
     return TreatmentPlan(
+      appointmentId: json['appointmentId'] as String? ?? '',
       patientId: json['patientId'] as String? ?? '',
       patientName: json['patientName'] as String? ?? '',
       symptoms: (json['symptoms'] as List<dynamic>?)?.map((e) => e as String).toList() ?? [],
@@ -106,6 +109,7 @@ class TreatmentPlan {
 
   Map<String, dynamic> toJson() {
     return {
+      'appointmentId': appointmentId,
       'patientId': patientId,
       'patientName': patientName,
       'symptoms': symptoms,

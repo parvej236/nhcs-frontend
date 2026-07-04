@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_primitives.dart';
 import '../data/models/appointment.dart';
 import '../presentation/providers/booking_provider.dart';
 import '../presentation/providers/patient_providers.dart';
@@ -22,6 +23,12 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
   final TextEditingController _symptomController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    _symptomController.text = 'গত কয়েক ঘণ্টা ধরে বুকের মাঝখানে তীব্র চাপ ও ভারী ভাব অনুভব করছি, যা আস্তে আস্তে বাম হাত এবং ঘাড়ে ছড়িয়ে যাচ্ছে। প্রচণ্ড ঘাম হচ্ছে এবং শ্বাস নিতে খুব কষ্ট হচ্ছে। সেই সাথে প্রচণ্ড মাথা ঘোরা এবং বমি বমি ভাব আছে। পালস রেট অনেক বেশি (Pulse 110 bpm), রক্তচাপ BP 165/100 এবং শরীরে অক্সিজেনের মাত্রা SpO2 92% দেখাচ্ছে।';
+  }
+
+  @override
   void dispose() {
     _symptomController.dispose();
     super.dispose();
@@ -37,23 +44,31 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
 
     final appointmentsState = ref.watch(patientAppointmentsProvider);
     final bookingState = ref.watch(bookingProvider);
+    final t = AppColors.of(context);
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: t.bgMain,
       body: Column(
         children: [
           // Header
           Container(
             padding: const EdgeInsets.all(24),
-            color: AppColors.surface,
+            decoration: BoxDecoration(
+              color: t.bgCard,
+              border: Border(bottom: BorderSide(color: t.border)),
+            ),
             child: Row(
               children: [
-                Text('Appointments Portal', style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold)),
+                Text(
+                  'Appointments Portal',
+                  style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold, color: t.textPrimary),
+                ),
                 const Spacer(),
-                ElevatedButton.icon(
+                AppButton(
                   onPressed: () => _openBookingDialog(null),
-                  icon: const Icon(Icons.add_rounded, size: 18),
-                  label: const Text('Book New'),
+                  icon: Icons.add_rounded,
+                  label: 'Book New',
+                  variant: AppButtonVariant.primary,
                 ),
               ],
             ),
@@ -67,19 +82,21 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
                   // Tab selector
                   Row(
                     children: [
-                      _tab('Upcoming'),
+                      _tab(context, 'Upcoming'),
                       const SizedBox(width: 8),
-                      _tab('Past'),
+                      _tab(context, 'Past'),
                       const SizedBox(width: 8),
-                      _tab('Cancelled'),
+                      _tab(context, 'Cancelled'),
                     ],
                   ),
                   const SizedBox(height: 24),
 
                   // Appointment listing based on selected tab
                   appointmentsState.when(
-                    loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
-                    error: (err, stack) => Center(child: Text('Error loading appointments: $err')),
+                    loading: () => Center(child: CircularProgressIndicator(color: t.brandPrimary)),
+                    error: (err, stack) => Center(
+                      child: Text('Error loading appointments: $err', style: TextStyle(color: t.textSecondary)),
+                    ),
                     data: (appointments) {
                       final filtered = appointments.where((a) => a.status == _activeTab).toList();
                       if (filtered.isEmpty) {
@@ -88,9 +105,12 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
                             padding: const EdgeInsets.symmetric(vertical: 40),
                             child: Column(
                               children: [
-                                const Icon(Icons.calendar_today_rounded, size: 40, color: AppColors.textMuted),
+                                Icon(Icons.calendar_today_rounded, size: 40, color: t.textSecondary.withValues(alpha: 0.5)),
                                 const SizedBox(height: 12),
-                                Text('No $_activeTab appointments found.', style: GoogleFonts.inter(color: AppColors.textSecondary)),
+                                Text(
+                                  'No $_activeTab appointments found.',
+                                  style: GoogleFonts.inter(color: t.textSecondary),
+                                ),
                               ],
                             ),
                           ),
@@ -103,27 +123,30 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
                         separatorBuilder: (context, index) => const SizedBox(height: 16),
                         itemBuilder: (context, index) {
                           final app = filtered[index];
-                          return _buildAppointmentCard(app);
+                          return _buildAppointmentCard(context, app);
                         },
                       );
                     },
                   ),
                   const SizedBox(height: 48),
 
-                  _buildAiSmartBookingAssistant(),
+                  _buildAiSmartBookingAssistant(context),
                   const SizedBox(height: 48),
 
                   // Find Doctor Section
-                  Text('Find a Medical Specialist', style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w600)),
+                  Text(
+                    'Find a Medical Specialist',
+                    style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w600, color: t.textPrimary),
+                  ),
                   const SizedBox(height: 16),
-                  _buildDoctorFilters(),
+                  _buildDoctorFilters(context),
                   const SizedBox(height: 24),
                   
                   // Doctor list
                   if (bookingState.isLoading && bookingState.availableDoctors.isEmpty)
-                    const Center(child: CircularProgressIndicator())
+                    Center(child: CircularProgressIndicator(color: t.brandPrimary))
                   else
-                    _buildDoctorList(bookingState.availableDoctors),
+                    _buildDoctorList(context, bookingState.availableDoctors),
                 ],
               ),
             ),
@@ -133,7 +156,8 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
     );
   }
 
-  Widget _tab(String label) {
+  Widget _tab(BuildContext context, String label) {
+    final t = AppColors.of(context);
     final active = _activeTab == label;
     return InkWell(
       onTap: () => setState(() => _activeTab = label),
@@ -141,14 +165,14 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
         decoration: BoxDecoration(
-          color: active ? AppColors.primary : AppColors.surface,
+          color: active ? t.brandPrimary : t.bgCard,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: active ? AppColors.primary : AppColors.divider),
+          border: Border.all(color: active ? t.brandPrimary : t.border),
         ),
         child: Text(
           label,
           style: GoogleFonts.inter(
-            color: active ? Colors.white : AppColors.textSecondary,
+            color: active ? Colors.white : t.textSecondary,
             fontWeight: FontWeight.w500,
             fontSize: 14,
           ),
@@ -157,41 +181,61 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
     );
   }
 
-  Widget _buildAppointmentCard(Appointment app) {
+  Widget _buildAppointmentCard(BuildContext context, Appointment app) {
+    final t = AppColors.of(context);
     final dateStr = "${app.date.day} ${_getMonthName(app.date.month)} ${app.date.year}";
-    final statusColor = _getStatusColor(app.status);
+    final statusColor = _getStatusColor(context, app.status);
 
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: t.bgCard,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.divider.withOpacity(0.5)),
+        border: Border.all(color: t.border),
       ),
       child: Row(
         children: [
           Container(
-            width: 56, height: 56,
-            decoration: BoxDecoration(color: AppColors.primaryLight, borderRadius: BorderRadius.circular(14)),
-            child: const Icon(Icons.person_rounded, color: AppColors.primary, size: 30),
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: t.brandPrimary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(Icons.person_rounded, color: t.brandPrimary, size: 30),
           ),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(app.doctor.name, style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 16)),
-                Text(app.doctor.specialization, style: GoogleFonts.inter(color: AppColors.secondary, fontSize: 13, fontWeight: FontWeight.w500)),
+                Text(
+                  app.doctor.name,
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 16, color: t.textPrimary),
+                ),
+                Text(
+                  app.doctor.specialization,
+                  style: GoogleFonts.inter(color: t.brandSecondary, fontSize: 13, fontWeight: FontWeight.w500),
+                ),
                 const SizedBox(height: 6),
                 Row(
                   children: [
-                    const Icon(Icons.access_time_rounded, size: 14, color: AppColors.textMuted),
+                    Icon(Icons.access_time_rounded, size: 14, color: t.textSecondary),
                     const SizedBox(width: 4),
-                    Text('$dateStr, ${app.timeSlot}', style: GoogleFonts.inter(color: AppColors.textSecondary, fontSize: 13)),
+                    Text(
+                      '$dateStr, ${app.timeSlot}',
+                      style: GoogleFonts.inter(color: t.textSecondary, fontSize: 13),
+                    ),
                     const SizedBox(width: 16),
-                    const Icon(Icons.location_on_outlined, size: 14, color: AppColors.textMuted),
+                    Icon(Icons.location_on_outlined, size: 14, color: t.textSecondary),
                     const SizedBox(width: 4),
-                    Expanded(child: Text(app.hospital, style: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 12), overflow: TextOverflow.ellipsis)),
+                    Expanded(
+                      child: Text(
+                        app.hospital,
+                        style: GoogleFonts.inter(color: t.textSecondary.withValues(alpha: 0.7), fontSize: 12),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -200,18 +244,73 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(6)),
-                child: Text(app.status, style: GoogleFonts.inter(color: statusColor, fontSize: 11, fontWeight: FontWeight.w600)),
-              ),
-              const SizedBox(height: 8),
-              Text('Queue: ${app.queueNumber}', style: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 12, fontWeight: FontWeight.w500)),
               if (app.status == 'Upcoming') ...[
+                if (app.approvalStatus == 'PENDING')
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(color: t.warning.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(6)),
+                    child: Text(
+                      'Pending Approval',
+                      style: GoogleFonts.inter(color: t.warning, fontSize: 11, fontWeight: FontWeight.w600),
+                    ),
+                  )
+                else if (app.approvalStatus == 'REJECTED')
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(color: t.danger.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(6)),
+                    child: Text(
+                      'Rejected',
+                      style: GoogleFonts.inter(color: t.danger, fontSize: 11, fontWeight: FontWeight.w600),
+                    ),
+                  )
+                else ...[
+                  if (app.arrivalStatus == 'CHECKED_IN')
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(color: t.success.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(6)),
+                      child: Text(
+                        'Checked In',
+                        style: GoogleFonts.inter(color: t.success, fontSize: 11, fontWeight: FontWeight.w600),
+                      ),
+                    )
+                  else if (app.arrivalStatus == 'COMPLETED')
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(color: t.textSecondary.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(6)),
+                      child: Text(
+                        'Completed',
+                        style: GoogleFonts.inter(color: t.textSecondary, fontSize: 11, fontWeight: FontWeight.w600),
+                      ),
+                    )
+                  else
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(color: t.brandSecondary.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(6)),
+                      child: Text(
+                        'Approved',
+                        style: GoogleFonts.inter(color: t.brandSecondary, fontSize: 11, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                ]
+              ] else
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(6)),
+                  child: Text(
+                    app.status,
+                    style: GoogleFonts.inter(color: statusColor, fontSize: 11, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              const SizedBox(height: 8),
+              Text(
+                'Queue: ${app.queueNumber}',
+                style: GoogleFonts.inter(color: t.textSecondary, fontSize: 12, fontWeight: FontWeight.w500),
+              ),
+              if (app.status == 'Upcoming' && app.approvalStatus == 'PENDING') ...[
                 const SizedBox(height: 4),
                 TextButton(
-                  onPressed: () => _confirmCancel(app.id),
-                  child: Text('Cancel', style: GoogleFonts.inter(color: AppColors.danger, fontSize: 12)),
+                  onPressed: () => _confirmCancel(context, app.id),
+                  child: Text('Cancel', style: GoogleFonts.inter(color: t.danger, fontSize: 12)),
                 ),
               ],
             ],
@@ -221,20 +320,23 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
     );
   }
 
-  Widget _buildDoctorFilters() {
+  Widget _buildDoctorFilters(BuildContext context) {
+    final t = AppColors.of(context);
     return Row(
       children: [
         Expanded(
           flex: 2,
           child: TextField(
+            style: GoogleFonts.inter(color: t.textPrimary, fontSize: 14),
             onChanged: (val) => setState(() => _searchQuery = val.toLowerCase()),
             decoration: InputDecoration(
               hintText: 'Search by doctor name or specialization...',
-              prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textMuted),
+              hintStyle: GoogleFonts.inter(color: t.textSecondary, fontSize: 14),
+              prefixIcon: Icon(Icons.search_rounded, color: t.textSecondary),
               filled: true,
-              fillColor: AppColors.surface,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.divider)),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.divider)),
+              fillColor: t.bgCard,
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: t.border)),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: t.border)),
             ),
           ),
         ),
@@ -244,15 +346,18 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             height: 50,
             decoration: BoxDecoration(
-              color: AppColors.surface,
+              color: t.bgCard,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.divider),
+              border: Border.all(color: t.border),
             ),
             child: DropdownButtonHideUnderline(
               child: DropdownButton<String>(
                 value: _specializationFilter,
+                dropdownColor: t.bgCard,
+                icon: Icon(Icons.arrow_drop_down, color: t.textSecondary),
+                style: GoogleFonts.inter(fontSize: 14, color: t.textPrimary),
                 items: ['All Specializations', 'Cardiology', 'Endocrinology', 'General Medicine', 'Gynaecology & Obstetrics']
-                    .map((e) => DropdownMenuItem(value: e, child: Text(e, style: GoogleFonts.inter(fontSize: 14))))
+                    .map((e) => DropdownMenuItem(value: e, child: Text(e)))
                     .toList(),
                 onChanged: (val) => setState(() => _specializationFilter = val ?? 'All Specializations'),
                 isExpanded: true,
@@ -264,7 +369,8 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
     );
   }
 
-  Widget _buildDoctorList(List<DoctorSpecialist> doctors) {
+  Widget _buildDoctorList(BuildContext context, List<DoctorSpecialist> doctors) {
+    final t = AppColors.of(context);
     final filtered = doctors.where((doc) {
       final matchesSearch = doc.name.toLowerCase().contains(_searchQuery) ||
           doc.specialization.toLowerCase().contains(_searchQuery);
@@ -277,7 +383,10 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
       return Center(
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 20),
-          child: Text('No doctors match your search filters.', style: GoogleFonts.inter(color: AppColors.textMuted)),
+          child: Text(
+            'No doctors match your search filters.',
+            style: GoogleFonts.inter(color: t.textSecondary),
+          ),
         ),
       );
     }
@@ -289,25 +398,27 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
       separatorBuilder: (context, index) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         final doc = filtered[index];
-        return _buildDoctorCard(doc);
+        return _buildDoctorCard(context, doc);
       },
     );
   }
 
-  Widget _buildDoctorCard(DoctorSpecialist doc) {
+  Widget _buildDoctorCard(BuildContext context, DoctorSpecialist doc) {
+    final t = AppColors.of(context);
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: t.bgCard,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.divider.withOpacity(0.5)),
+        border: Border.all(color: t.border),
       ),
       child: Row(
         children: [
           Container(
-            width: 56, height: 56,
+            width: 56,
+            height: 56,
             decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [AppColors.secondary, Color(0xFF0EA5E9)]), 
+              gradient: LinearGradient(colors: [t.brandSecondary, t.brandPrimary]),
               borderRadius: BorderRadius.circular(14),
             ),
             child: const Icon(Icons.medical_services_rounded, color: Colors.white, size: 28),
@@ -317,15 +428,27 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(doc.name, style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 15)),
-                Text('${doc.specialization} • ${doc.hospital}', style: GoogleFonts.inter(color: AppColors.secondary, fontSize: 13)),
+                Text(
+                  doc.name,
+                  style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 15, color: t.textPrimary),
+                ),
+                Text(
+                  '${doc.specialization} • ${doc.hospital}',
+                  style: GoogleFonts.inter(color: t.brandSecondary, fontSize: 13),
+                ),
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    Text('${doc.experienceYears} years exp.', style: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 12)),
+                    Text(
+                      '${doc.experienceYears} years exp.',
+                      style: GoogleFonts.inter(color: t.textSecondary, fontSize: 12),
+                    ),
                     const SizedBox(width: 12),
                     const Icon(Icons.star_rounded, size: 14, color: Colors.amber),
-                    Text(' ${doc.rating}', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
+                    Text(
+                      ' ${doc.rating}',
+                      style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: t.textPrimary),
+                    ),
                   ],
                 ),
               ],
@@ -334,15 +457,17 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text('৳${doc.consultationFee}', style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary)),
+              Text(
+                '৳${doc.consultationFee}',
+                style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.bold, color: t.brandPrimary),
+              ),
               const SizedBox(height: 8),
-              ElevatedButton(
+              AppButton(
+                label: 'Book Slot',
                 onPressed: () => _openBookingDialog(doc),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  textStyle: GoogleFonts.inter(fontSize: 13),
-                ),
-                child: const Text('Book Slot'),
+                variant: AppButtonVariant.primary,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                fontSize: 13,
               ),
             ],
           ),
@@ -351,21 +476,37 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
     );
   }
 
-  void _confirmCancel(String appointmentId) {
+  void _confirmCancel(BuildContext context, String appointmentId) {
+    final t = AppColors.of(context);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Cancel Appointment', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
-        content: const Text('Are you sure you want to cancel this appointment? This action cannot be undone.'),
+        backgroundColor: t.bgCard,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: t.border),
+        ),
+        title: Text(
+          'Cancel Appointment',
+          style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: t.textPrimary),
+        ),
+        content: Text(
+          'Are you sure you want to cancel this appointment? This action cannot be undone.',
+          style: GoogleFonts.inter(color: t.textSecondary),
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('No, Keep')),
-          ElevatedButton(
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('No, Keep', style: TextStyle(color: t.textSecondary)),
+          ),
+          AppButton(
             onPressed: () {
               ref.read(patientAppointmentsProvider.notifier).cancelAppointment(appointmentId);
               Navigator.pop(context);
             },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.danger),
-            child: const Text('Yes, Cancel'),
+            label: 'Yes, Cancel',
+            variant: AppButtonVariant.danger,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           ),
         ],
       ),
@@ -384,16 +525,17 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
     );
   }
 
-  Color _getStatusColor(String status) {
+  Color _getStatusColor(BuildContext context, String status) {
+    final t = AppColors.of(context);
     switch (status) {
       case 'Upcoming':
-        return AppColors.primary;
+        return t.brandPrimary;
       case 'Past':
-        return AppColors.success;
+        return t.success;
       case 'Cancelled':
-        return AppColors.danger;
+        return t.danger;
       default:
-        return AppColors.textSecondary;
+        return t.textSecondary;
     }
   }
 
@@ -405,21 +547,22 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
     return '';
   }
 
-  Widget _buildAiSmartBookingAssistant() {
+  Widget _buildAiSmartBookingAssistant(BuildContext context) {
     final aiState = ref.watch(aiSuggestionProvider);
+    final t = AppColors.of(context);
 
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: t.bgCard,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: AppColors.primary.withOpacity(0.15),
+          color: t.brandPrimary.withValues(alpha: 0.2),
           width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: t.isDark ? 0.2 : 0.04),
             blurRadius: 24,
             offset: const Offset(0, 8),
           ),
@@ -435,8 +578,8 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF8B5CF6), AppColors.primary],
+                  gradient: LinearGradient(
+                    colors: [const Color(0xFF8B5CF6), t.brandPrimary],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
@@ -465,7 +608,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
                   style: GoogleFonts.outfit(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
+                    color: t.textPrimary,
                   ),
                 ),
               ),
@@ -475,7 +618,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
           Text(
             'Describe your medical symptoms in Bangla or English, or use voice input. The AI will analyze your condition, summarize your symptoms, recommend the proper specialist, and locate the nearest hospitals and doctors.',
             style: GoogleFonts.inter(
-              color: AppColors.textSecondary,
+              color: t.textSecondary,
               fontSize: 13.5,
               height: 1.5,
             ),
@@ -490,28 +633,28 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
                 child: TextField(
                   controller: _symptomController,
                   maxLines: 3,
+                  style: GoogleFonts.inter(fontSize: 14, color: t.textPrimary),
                   decoration: InputDecoration(
                     hintText: aiState.isListening
                         ? 'আমি শুনছি, বলুন... (উদা: আমার মাথা ব্যাথ ও বমি বমি ভাব)'
                         : 'আপনার সমস্যাটি বিস্তারিত লিখুন বা বলুন (উদা: কয়েক দিন ধরে বুকে ব্যথা ও শ্বাসকষ্ট)...',
-                    hintStyle: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 13.5),
-                    fillColor: AppColors.background,
+                    hintStyle: GoogleFonts.inter(color: t.textSecondary, fontSize: 13.5),
+                    fillColor: t.bgInput,
                     filled: true,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.divider),
+                      borderSide: BorderSide(color: t.border),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.divider),
+                      borderSide: BorderSide(color: t.border),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                      borderSide: BorderSide(color: t.brandPrimary, width: 1.5),
                     ),
                     contentPadding: const EdgeInsets.all(16),
                   ),
-                  style: GoogleFonts.inter(fontSize: 14, color: AppColors.textPrimary),
                   onChanged: (val) {
                     ref.read(aiSuggestionProvider.notifier).updateSpeechText(val);
                   },
@@ -538,16 +681,16 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: aiState.isListening
-                              ? AppColors.danger.withOpacity(0.1)
-                              : AppColors.primaryLight,
+                              ? t.danger.withValues(alpha: 0.12)
+                              : t.brandPrimary.withValues(alpha: 0.12),
                           border: Border.all(
-                            color: aiState.isListening ? AppColors.danger : AppColors.primary,
+                            color: aiState.isListening ? t.danger : t.brandPrimary,
                             width: 1.5,
                           ),
                         ),
                         child: Icon(
                           aiState.isListening ? Icons.mic_off_rounded : Icons.mic_rounded,
-                          color: aiState.isListening ? AppColors.danger : AppColors.primary,
+                          color: aiState.isListening ? t.danger : t.brandPrimary,
                           size: 24,
                         ),
                       ),
@@ -563,7 +706,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
                     child: Text(
                       'Clear',
                       style: GoogleFonts.inter(
-                        color: AppColors.textSecondary,
+                        color: t.textSecondary,
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
                       ),
@@ -578,19 +721,19 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
             const SizedBox(height: 12),
             Row(
               children: [
-                const SizedBox(
+                SizedBox(
                   width: 16,
                   height: 16,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.danger),
+                    valueColor: AlwaysStoppedAnimation<Color>(t.danger),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Text(
                   'Listening... Speak in Bangla (বাংলায় বলুন)',
                   style: GoogleFonts.inter(
-                    color: AppColors.danger,
+                    color: t.danger,
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),
@@ -612,7 +755,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
                       ref.read(aiSuggestionProvider.notifier).getSuggestion(_symptomController.text);
                     },
               icon: aiState.isLoading
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 18,
                       height: 18,
                       child: CircularProgressIndicator(
@@ -626,8 +769,10 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
                 style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14),
               ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                disabledBackgroundColor: AppColors.divider,
+                backgroundColor: t.brandPrimary,
+                disabledBackgroundColor: t.bgInput,
+                foregroundColor: Colors.white,
+                disabledForegroundColor: t.textSecondary,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
             ),
@@ -638,17 +783,17 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppColors.dangerLight,
+                color: t.danger.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.error_outline, color: AppColors.danger, size: 20),
+                  Icon(Icons.error_outline, color: t.danger, size: 20),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       aiState.errorMessage!,
-                      style: GoogleFonts.inter(color: AppColors.danger, fontSize: 13),
+                      style: GoogleFonts.inter(color: t.danger, fontSize: 13),
                     ),
                   ),
                 ],
@@ -659,30 +804,31 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
           // AI Suggestion Result Display
           if (aiState.suggestion != null) ...[
             const SizedBox(height: 24),
-            const Divider(),
+            Divider(color: t.border),
             const SizedBox(height: 16),
-            _buildAiResultsSection(aiState.suggestion!),
+            _buildAiResultsSection(context, aiState.suggestion!),
           ],
         ],
       ),
     );
   }
 
-  Widget _buildAiResultsSection(AiSuggestionResponse suggestion) {
+  Widget _buildAiResultsSection(BuildContext context, AiSuggestionResponse suggestion) {
+    final t = AppColors.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // AI Health Summary
         Row(
           children: [
-            const Icon(Icons.description_outlined, color: AppColors.primary, size: 20),
+            Icon(Icons.description_outlined, color: t.brandPrimary, size: 20),
             const SizedBox(width: 8),
             Text(
               'AI Health Summary (স্বাস্থ্য সারসংক্ষেপ):',
               style: GoogleFonts.outfit(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+                color: t.textPrimary,
               ),
             ),
           ],
@@ -692,9 +838,9 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
           width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppColors.primaryLight.withOpacity(0.3),
+            color: t.brandPrimary.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.primary.withOpacity(0.1)),
+            border: Border.all(color: t.brandPrimary.withValues(alpha: 0.1)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -704,7 +850,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
                 style: GoogleFonts.inter(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.primary,
+                  color: t.brandPrimary,
                 ),
               ),
               const SizedBox(height: 4),
@@ -712,7 +858,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
                 suggestion.summaryEn,
                 style: GoogleFonts.inter(
                   fontSize: 13.5,
-                  color: AppColors.textPrimary,
+                  color: t.textPrimary,
                   height: 1.45,
                 ),
               ),
@@ -722,7 +868,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
                 style: GoogleFonts.inter(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.primary,
+                  color: t.brandPrimary,
                 ),
               ),
               const SizedBox(height: 4),
@@ -730,7 +876,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
                 suggestion.summaryBn,
                 style: GoogleFonts.inter(
                   fontSize: 13.5,
-                  color: AppColors.textPrimary,
+                  color: t.textPrimary,
                   height: 1.45,
                 ),
               ),
@@ -742,21 +888,21 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
         // Estimated Specialization
         Row(
           children: [
-            const Icon(Icons.category_outlined, color: AppColors.primary, size: 20),
+            Icon(Icons.category_outlined, color: t.brandPrimary, size: 20),
             const SizedBox(width: 8),
             Text(
               'Recommended Specialization:',
               style: GoogleFonts.outfit(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+                color: t.textPrimary,
               ),
             ),
             const Spacer(),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               decoration: BoxDecoration(
-                color: AppColors.primary,
+                color: t.brandPrimary,
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
@@ -775,14 +921,14 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
         // Suggested Hospitals (Proximity Aware)
         Row(
           children: [
-            const Icon(Icons.location_on_rounded, color: AppColors.primary, size: 20),
+            Icon(Icons.location_on_rounded, color: t.brandPrimary, size: 20),
             const SizedBox(width: 8),
             Text(
               'Nearby Matching Hospitals:',
               style: GoogleFonts.outfit(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+                color: t.textPrimary,
               ),
             ),
           ],
@@ -798,13 +944,13 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
             return Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: AppColors.background,
+                color: t.bgInput,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppColors.divider),
+                border: Border.all(color: t.border),
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.local_hospital_rounded, color: AppColors.primary, size: 20),
+                  Icon(Icons.local_hospital_rounded, color: t.brandPrimary, size: 20),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -815,7 +961,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
                           style: GoogleFonts.inter(
                             fontWeight: FontWeight.bold,
                             fontSize: 13.5,
-                            color: AppColors.textPrimary,
+                            color: t.textPrimary,
                           ),
                         ),
                         const SizedBox(height: 2),
@@ -823,7 +969,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
                           hospital.address,
                           style: GoogleFonts.inter(
                             fontSize: 12,
-                            color: AppColors.textSecondary,
+                            color: t.textSecondary,
                           ),
                         ),
                       ],
@@ -833,13 +979,13 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: AppColors.primaryLight,
+                      color: t.brandPrimary.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
                       hospital.distance,
                       style: GoogleFonts.inter(
-                        color: AppColors.primary,
+                        color: t.brandPrimary,
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                       ),
@@ -856,14 +1002,14 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
         // Recommended Doctors
         Row(
           children: [
-            const Icon(Icons.people_outline_rounded, color: AppColors.primary, size: 20),
+            Icon(Icons.people_outline_rounded, color: t.brandPrimary, size: 20),
             const SizedBox(width: 8),
             Text(
               'Recommended Doctors:',
               style: GoogleFonts.outfit(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+                color: t.textPrimary,
               ),
             ),
           ],
@@ -874,7 +1020,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
             padding: const EdgeInsets.symmetric(vertical: 20),
             child: Text(
               'No matching doctors found for this specialization.',
-              style: GoogleFonts.inter(color: AppColors.textSecondary, fontStyle: FontStyle.italic),
+              style: GoogleFonts.inter(color: t.textSecondary, fontStyle: FontStyle.italic),
             ),
           )
         else
@@ -893,12 +1039,12 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
               return Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: AppColors.surface,
+                  color: t.bgCard,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.divider),
+                  border: Border.all(color: t.border),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.02),
+                      color: Colors.black.withValues(alpha: t.isDark ? 0.2 : 0.02),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -908,10 +1054,10 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
                   children: [
                     CircleAvatar(
                       radius: 28,
-                      backgroundColor: AppColors.primary.withOpacity(0.1),
+                      backgroundColor: t.brandPrimary.withValues(alpha: 0.1),
                       backgroundImage: doc.imageUrl.isNotEmpty ? NetworkImage(doc.imageUrl) : null,
                       child: doc.imageUrl.isEmpty
-                          ? const Icon(Icons.person, size: 28, color: AppColors.primary)
+                          ? Icon(Icons.person, size: 28, color: t.brandPrimary)
                           : null,
                     ),
                     const SizedBox(width: 14),
@@ -925,7 +1071,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
                             style: GoogleFonts.inter(
                               fontWeight: FontWeight.bold,
                               fontSize: 14,
-                              color: AppColors.textPrimary,
+                              color: t.textPrimary,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -935,7 +1081,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
                             doc.specialization,
                             style: GoogleFonts.inter(
                               fontSize: 11.5,
-                              color: AppColors.primary,
+                              color: t.brandPrimary,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -944,7 +1090,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
                             doc.hospital,
                             style: GoogleFonts.inter(
                               fontSize: 11,
-                              color: AppColors.textMuted,
+                              color: t.textSecondary,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -959,7 +1105,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
                                 style: GoogleFonts.inter(
                                   fontSize: 11.5,
                                   fontWeight: FontWeight.bold,
-                                  color: AppColors.textPrimary,
+                                  color: t.textPrimary,
                                 ),
                               ),
                               const SizedBox(width: 8),
@@ -967,7 +1113,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
                                 '${doc.experienceYears} Yrs Exp',
                                 style: GoogleFonts.inter(
                                   fontSize: 11,
-                                  color: AppColors.textSecondary,
+                                  color: t.textSecondary,
                                 ),
                               ),
                             ],
@@ -985,24 +1131,16 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
                           style: GoogleFonts.inter(
                             fontWeight: FontWeight.bold,
                             fontSize: 13,
-                            color: AppColors.textPrimary,
+                            color: t.textPrimary,
                           ),
                         ),
                         const SizedBox(height: 8),
-                        ElevatedButton(
+                        AppButton(
+                          label: 'Book Slot',
                           onPressed: () => _openBookingDialog(doc),
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          child: Text(
-                            'Book Slot',
-                            style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.bold),
-                          ),
+                          variant: AppButtonVariant.primary,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          fontSize: 11.5,
                         ),
                       ],
                     ),
@@ -1030,14 +1168,18 @@ class _BookingWizardDialogState extends ConsumerState<_BookingWizardDialog> {
   Widget build(BuildContext context) {
     final bookingState = ref.watch(bookingProvider);
     final isDoctorSelected = bookingState.selectedDoctor != null;
+    final t = AppColors.of(context);
 
     if (isDoctorSelected && _step == 0) {
-      // If doctor was pre-selected, skip Step 0 (Select Doctor)
       _step = 1;
     }
 
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      backgroundColor: t.bgCard,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: t.border),
+      ),
       child: Container(
         width: 550,
         height: 520,
@@ -1048,25 +1190,25 @@ class _BookingWizardDialogState extends ConsumerState<_BookingWizardDialog> {
               children: [
                 Text(
                   bookingState.createdAppointment != null ? 'Booking Confirmed' : 'Book Appointment',
-                  style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold),
+                  style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: t.textPrimary),
                 ),
                 const Spacer(),
                 if (bookingState.createdAppointment == null)
                   IconButton(
                     onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close_rounded),
+                    icon: Icon(Icons.close_rounded, color: t.textSecondary),
                   ),
               ],
             ),
-            const Divider(),
+            Divider(color: t.border),
             Expanded(
               child: bookingState.createdAppointment != null
-                  ? _buildSuccessView(bookingState.createdAppointment!)
-                  : _buildStepContent(bookingState),
+                  ? _buildSuccessView(context, bookingState.createdAppointment!)
+                  : _buildStepContent(context, bookingState),
             ),
             if (bookingState.createdAppointment == null) ...[
-              const Divider(),
-              _buildActionsRow(bookingState),
+              Divider(color: t.border),
+              _buildActionsRow(context, bookingState),
             ],
           ],
         ),
@@ -1074,29 +1216,34 @@ class _BookingWizardDialogState extends ConsumerState<_BookingWizardDialog> {
     );
   }
 
-  Widget _buildStepContent(BookingState state) {
+  Widget _buildStepContent(BuildContext context, BookingState state) {
+    final t = AppColors.of(context);
     if (state.isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(child: CircularProgressIndicator(color: t.brandPrimary));
     }
 
     switch (_step) {
       case 0:
-        return _buildDoctorSelectorStep(state);
+        return _buildDoctorSelectorStep(context, state);
       case 1:
-        return _buildDateTimeSelectorStep(state);
+        return _buildDateTimeSelectorStep(context, state);
       case 2:
-        return _buildConfirmationStep(state);
+        return _buildConfirmationStep(context, state);
       default:
         return const SizedBox.shrink();
     }
   }
 
-  Widget _buildDoctorSelectorStep(BookingState state) {
+  Widget _buildDoctorSelectorStep(BuildContext context, BookingState state) {
+    final t = AppColors.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 8),
-        Text('Select a Doctor to begin:', style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14)),
+        Text(
+          'Select a Doctor to begin:',
+          style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14, color: t.textPrimary),
+        ),
         const SizedBox(height: 16),
         Expanded(
           child: ListView.separated(
@@ -1105,10 +1252,13 @@ class _BookingWizardDialogState extends ConsumerState<_BookingWizardDialog> {
             itemBuilder: (context, index) {
               final doc = state.availableDoctors[index];
               return ListTile(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: AppColors.divider)),
-                title: Text(doc.name, style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
-                subtitle: Text('${doc.specialization} • ${doc.hospital}'),
-                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(color: t.border),
+                ),
+                title: Text(doc.name, style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: t.textPrimary)),
+                subtitle: Text('${doc.specialization} • ${doc.hospital}', style: TextStyle(color: t.textSecondary)),
+                trailing: Icon(Icons.arrow_forward_ios_rounded, size: 14, color: t.textSecondary),
                 onTap: () {
                   ref.read(bookingProvider.notifier).selectDoctor(doc);
                   setState(() => _step = 1);
@@ -1121,14 +1271,15 @@ class _BookingWizardDialogState extends ConsumerState<_BookingWizardDialog> {
     );
   }
 
-  Widget _buildDateTimeSelectorStep(BookingState state) {
+  Widget _buildDateTimeSelectorStep(BuildContext context, BookingState state) {
+    final t = AppColors.of(context);
     final next7Days = List.generate(7, (i) => DateTime.now().add(Duration(days: i + 1)));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 8),
-        Text('Select Date:', style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14)),
+        Text('Select Date:', style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14, color: t.textPrimary)),
         const SizedBox(height: 12),
         SizedBox(
           height: 64,
@@ -1149,21 +1300,29 @@ class _BookingWizardDialogState extends ConsumerState<_BookingWizardDialog> {
                 child: Container(
                   width: 64,
                   decoration: BoxDecoration(
-                    color: isSelected ? AppColors.primary : AppColors.background,
+                    color: isSelected ? t.brandPrimary : t.bgInput,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: isSelected ? AppColors.primary : AppColors.divider),
+                    border: Border.all(color: isSelected ? t.brandPrimary : t.border),
                   ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
                         _getWeekdayName(date.weekday),
-                        style: GoogleFonts.inter(color: isSelected ? Colors.white70 : AppColors.textMuted, fontSize: 11, fontWeight: FontWeight.w500),
+                        style: GoogleFonts.inter(
+                          color: isSelected ? Colors.white70 : t.textSecondary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         date.day.toString(),
-                        style: GoogleFonts.inter(color: isSelected ? Colors.white : AppColors.textPrimary, fontSize: 16, fontWeight: FontWeight.bold),
+                        style: GoogleFonts.inter(
+                          color: isSelected ? Colors.white : t.textPrimary,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ],
                   ),
@@ -1173,7 +1332,7 @@ class _BookingWizardDialogState extends ConsumerState<_BookingWizardDialog> {
           ),
         ),
         const SizedBox(height: 24),
-        Text('Select Time Slot:', style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14)),
+        Text('Select Time Slot:', style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14, color: t.textPrimary)),
         const SizedBox(height: 12),
         Expanded(
           child: GridView.builder(
@@ -1196,13 +1355,13 @@ class _BookingWizardDialogState extends ConsumerState<_BookingWizardDialog> {
                 child: Container(
                   decoration: BoxDecoration(
                     color: isSelected 
-                        ? AppColors.secondary 
-                        : (slot.isAvailable ? AppColors.background : Colors.black12.withOpacity(0.04)),
+                        ? t.brandSecondary 
+                        : (slot.isAvailable ? t.bgInput : t.border.withValues(alpha: 0.15)),
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
                       color: isSelected 
-                          ? AppColors.secondary 
-                          : (slot.isAvailable ? AppColors.divider : Colors.transparent),
+                          ? t.brandSecondary 
+                          : (slot.isAvailable ? t.border : Colors.transparent),
                     ),
                   ),
                   alignment: Alignment.center,
@@ -1213,7 +1372,7 @@ class _BookingWizardDialogState extends ConsumerState<_BookingWizardDialog> {
                       fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                       color: isSelected 
                           ? Colors.white 
-                          : (slot.isAvailable ? AppColors.textPrimary : AppColors.textMuted),
+                          : (slot.isAvailable ? t.textPrimary : t.textSecondary.withValues(alpha: 0.6)),
                     ),
                   ),
                 ),
@@ -1225,7 +1384,8 @@ class _BookingWizardDialogState extends ConsumerState<_BookingWizardDialog> {
     );
   }
 
-  Widget _buildConfirmationStep(BookingState state) {
+  Widget _buildConfirmationStep(BuildContext context, BookingState state) {
+    final t = AppColors.of(context);
     final doc = state.selectedDoctor!;
     final dateStr = state.selectedDate != null
         ? "${state.selectedDate!.day} ${_getMonthName(state.selectedDate!.month)} ${state.selectedDate!.year}"
@@ -1238,34 +1398,35 @@ class _BookingWizardDialogState extends ConsumerState<_BookingWizardDialog> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppColors.primaryLight,
+            color: t.brandPrimary.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(14),
           ),
           child: Row(
             children: [
-              const Icon(Icons.info_outline_rounded, color: AppColors.primary),
+              Icon(Icons.info_outline_rounded, color: t.brandPrimary),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   'Please review the details below before confirming the booking.',
-                  style: GoogleFonts.inter(color: AppColors.primary, fontSize: 13, fontWeight: FontWeight.w500),
+                  style: GoogleFonts.inter(color: t.brandPrimary, fontSize: 13, fontWeight: FontWeight.w500),
                 ),
               ),
             ],
           ),
         ),
         const SizedBox(height: 24),
-        _detailRow('Doctor', doc.name),
-        _detailRow('Specialization', doc.specialization),
-        _detailRow('Hospital', doc.hospital),
-        _detailRow('Date', dateStr),
-        _detailRow('Time Slot', state.selectedTimeSlot ?? ''),
-        _detailRow('Consultation Fee', '৳${doc.consultationFee}', isBold: true),
+        _detailRow(context, 'Doctor', doc.name),
+        _detailRow(context, 'Specialization', doc.specialization),
+        _detailRow(context, 'Hospital', doc.hospital),
+        _detailRow(context, 'Date', dateStr),
+        _detailRow(context, 'Time Slot', state.selectedTimeSlot ?? ''),
+        _detailRow(context, 'Consultation Fee', '৳${doc.consultationFee}', isBold: true),
       ],
     );
   }
 
-  Widget _buildSuccessView(Appointment app) {
+  Widget _buildSuccessView(BuildContext context, Appointment app) {
+    final t = AppColors.of(context);
     final dateStr = "${app.date.day} ${_getMonthName(app.date.month)} ${app.date.year}";
     return Center(
       child: Column(
@@ -1273,65 +1434,71 @@ class _BookingWizardDialogState extends ConsumerState<_BookingWizardDialog> {
         children: [
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: const BoxDecoration(color: AppColors.successLight, shape: BoxShape.circle),
-            child: const Icon(Icons.check_circle_rounded, size: 56, color: AppColors.success),
+            decoration: BoxDecoration(color: t.success.withValues(alpha: 0.15), shape: BoxShape.circle),
+            child: Icon(Icons.check_circle_rounded, size: 56, color: t.success),
           ),
           const SizedBox(height: 20),
-          Text('Appointment Placed!', style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.bold)),
+          Text(
+            'Appointment Placed!',
+            style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.bold, color: t.textPrimary),
+          ),
           const SizedBox(height: 8),
           Text(
             'Your appointment with ${app.doctor.name} has been booked.',
             textAlign: TextAlign.center,
-            style: GoogleFonts.inter(color: AppColors.textSecondary, fontSize: 14),
+            style: GoogleFonts.inter(color: t.textSecondary, fontSize: 14),
           ),
           const SizedBox(height: 24),
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: AppColors.background, borderRadius: BorderRadius.circular(12)),
+            decoration: BoxDecoration(color: t.bgInput, borderRadius: BorderRadius.circular(12)),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _successStat('Queue', app.queueNumber),
-                Container(width: 1, height: 32, color: AppColors.divider),
-                _successStat('Time', app.timeSlot),
-                Container(width: 1, height: 32, color: AppColors.divider),
-                _successStat('Date', dateStr),
+                _successStat(context, 'Queue', app.queueNumber),
+                Container(width: 1, height: 32, color: t.border),
+                _successStat(context, 'Time', app.timeSlot),
+                Container(width: 1, height: 32, color: t.border),
+                _successStat(context, 'Date', dateStr),
               ],
             ),
           ),
           const SizedBox(height: 24),
-          ElevatedButton(
+          AppButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Back to Dashboard'),
+            label: 'Back to Dashboard',
+            variant: AppButtonVariant.primary,
           ),
         ],
       ),
     );
   }
 
-  Widget _successStat(String label, String val) {
+  Widget _successStat(BuildContext context, String label, String val) {
+    final t = AppColors.of(context);
     return Column(
       children: [
-        Text(label, style: GoogleFonts.inter(fontSize: 11, color: AppColors.textMuted)),
+        Text(label, style: GoogleFonts.inter(fontSize: 11, color: t.textSecondary)),
         const SizedBox(height: 4),
-        Text(val, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+        Text(val, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: t.textPrimary)),
       ],
     );
   }
 
-  Widget _detailRow(String label, String value, {bool isBold = false}) {
+  Widget _detailRow(BuildContext context, String label, String value, {bool isBold = false}) {
+    final t = AppColors.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 14)),
+          Text(label, style: GoogleFonts.inter(color: t.textSecondary, fontSize: 14)),
           Text(
             value,
             style: GoogleFonts.inter(
               fontSize: 14,
               fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
-              color: isBold ? AppColors.primary : AppColors.textPrimary,
+              color: isBold ? t.brandPrimary : t.textPrimary,
             ),
           ),
         ],
@@ -1339,14 +1506,17 @@ class _BookingWizardDialogState extends ConsumerState<_BookingWizardDialog> {
     );
   }
 
-  Widget _buildActionsRow(BookingState state) {
+  Widget _buildActionsRow(BuildContext context, BookingState state) {
+    final t = AppColors.of(context);
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         if (_step > 0)
-          OutlinedButton(
+          AppButton(
             onPressed: () => setState(() => _step--),
-            child: const Text('Back'),
+            label: 'Back',
+            variant: AppButtonVariant.secondary,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           )
         else
           const SizedBox.shrink(),
@@ -1354,23 +1524,27 @@ class _BookingWizardDialogState extends ConsumerState<_BookingWizardDialog> {
           children: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
+              child: Text('Cancel', style: TextStyle(color: t.textSecondary)),
             ),
             const SizedBox(width: 12),
             if (_step < 2)
-              ElevatedButton(
+              AppButton(
                 onPressed: (state.selectedDoctor != null && _step == 0) ||
                            (state.selectedDate != null && state.selectedTimeSlot != null && _step == 1)
                     ? () => setState(() => _step++)
                     : null,
-                child: const Text('Next'),
+                label: 'Next',
+                variant: AppButtonVariant.primary,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               )
             else
-              ElevatedButton(
+              AppButton(
                 onPressed: () async {
                   await ref.read(bookingProvider.notifier).confirmBooking('NUD-892-441-X7', ref);
                 },
-                child: const Text('Confirm Booking'),
+                label: 'Confirm Booking',
+                variant: AppButtonVariant.primary,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               ),
           ],
         ),

@@ -5,9 +5,12 @@ import '../../data/models/patient_queue_item.dart';
 import '../../data/models/report_review_item.dart';
 import '../../data/repositories/doctor_repository.dart';
 
+import '../../../../core/providers/dio_provider.dart';
+
 // Repository Provider
 final doctorRepositoryProvider = Provider<DoctorRepository>((ref) {
-  return DoctorRepositoryImpl();
+  final dio = ref.watch(dioProvider);
+  return DoctorRepositoryImpl(dio);
 });
 
 // Navigation Provider

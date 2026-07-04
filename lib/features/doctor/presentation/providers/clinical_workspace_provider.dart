@@ -4,6 +4,7 @@ import '../../data/models/clinical_case.dart';
 import 'doctor_providers.dart';
 
 class ClinicalWorkspaceState {
+  final String appointmentId;
   final String patientId;
   final String patientName;
   final List<String> symptoms;
@@ -16,8 +17,11 @@ class ClinicalWorkspaceState {
   final bool isSubmitting;
   final bool isSuccess;
   final String? error;
+  final bool isGeneratingBriefing;
+  final String? aiBriefingText;
 
   ClinicalWorkspaceState({
+    this.appointmentId = '',
     this.patientId = '',
     this.patientName = '',
     this.symptoms = const [],
@@ -30,9 +34,12 @@ class ClinicalWorkspaceState {
     this.isSubmitting = false,
     this.isSuccess = false,
     this.error,
+    this.isGeneratingBriefing = false,
+    this.aiBriefingText,
   });
 
   ClinicalWorkspaceState copyWith({
+    String? appointmentId,
     String? patientId,
     String? patientName,
     List<String>? symptoms,
@@ -45,8 +52,11 @@ class ClinicalWorkspaceState {
     bool? isSubmitting,
     bool? isSuccess,
     String? error,
+    bool? isGeneratingBriefing,
+    String? aiBriefingText,
   }) {
     return ClinicalWorkspaceState(
+      appointmentId: appointmentId ?? this.appointmentId,
       patientId: patientId ?? this.patientId,
       patientName: patientName ?? this.patientName,
       symptoms: symptoms ?? this.symptoms,
@@ -59,6 +69,8 @@ class ClinicalWorkspaceState {
       isSubmitting: isSubmitting ?? this.isSubmitting,
       isSuccess: isSuccess ?? this.isSuccess,
       error: error ?? this.error,
+      isGeneratingBriefing: isGeneratingBriefing ?? this.isGeneratingBriefing,
+      aiBriefingText: aiBriefingText ?? this.aiBriefingText,
     );
   }
 }
@@ -68,11 +80,27 @@ class ClinicalWorkspaceNotifier extends StateNotifier<ClinicalWorkspaceState> {
 
   ClinicalWorkspaceNotifier(this._ref) : super(ClinicalWorkspaceState());
 
-  void initializePatient(String patientId, String patientName) {
+  void initializePatient(String appointmentId, String patientId, String patientName) {
     state = ClinicalWorkspaceState(
+      appointmentId: appointmentId,
       patientId: patientId,
       patientName: patientName,
     );
+  }
+
+  Future<void> generateBriefing() async {
+    if (state.appointmentId.isEmpty) {
+      state = state.copyWith(error: 'Cannot generate AI briefing: No active appointment selected.');
+      return;
+    }
+    state = state.copyWith(isGeneratingBriefing: true, error: null);
+    try {
+      final repo = _ref.read(doctorRepositoryProvider);
+      final briefing = await repo.getAiBriefing(state.appointmentId);
+      state = state.copyWith(isGeneratingBriefing: false, aiBriefingText: briefing);
+    } catch (e) {
+      state = state.copyWith(isGeneratingBriefing: false, error: 'Briefing failed: ${e.toString()}');
+    }
   }
 
   void addSymptom(String symptom) {
@@ -154,6 +182,7 @@ class ClinicalWorkspaceNotifier extends StateNotifier<ClinicalWorkspaceState> {
       final repository = _ref.read(doctorRepositoryProvider);
       
       final plan = TreatmentPlan(
+        appointmentId: state.appointmentId,
         patientId: state.patientId,
         patientName: state.patientName,
         symptoms: state.symptoms,

@@ -4,10 +4,8 @@ import '../../../core/widgets/sidebar.dart';
 import '../presentation/providers/hospital_providers.dart';
 import 'command_center_page.dart';
 import 'reception_queue_page.dart';
-import 'staff_management_page.dart';
 import 'laboratory_page.dart';
-import 'bed_management_page.dart';
-import 'pharmacy_page.dart';
+import 'blood_donation_management_page.dart';
 
 class HospitalShell extends ConsumerWidget {
   const HospitalShell({super.key});
@@ -15,10 +13,8 @@ class HospitalShell extends ConsumerWidget {
   static const List<Widget> _pages = [
     CommandCenterPage(),
     ReceptionQueuePage(),
-    StaffManagementPage(),
     LaboratoryPage(),
-    BedManagementPage(),
-    PharmacyPage(),
+    BloodDonationManagementPage(),
   ];
 
   @override

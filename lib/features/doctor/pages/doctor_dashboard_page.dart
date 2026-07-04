@@ -300,7 +300,7 @@ class DoctorDashboardPage extends ConsumerWidget {
           ElevatedButton(
             onPressed: () {
               // Initialize Workspace Provider with this patient's details
-              ref.read(clinicalWorkspaceProvider.notifier).initializePatient(item.healthId, item.name);
+              ref.read(clinicalWorkspaceProvider.notifier).initializePatient(item.id, item.healthId, item.name);
               // Switch tab to Clinical Workspace (Index 1)
               ref.read(doctorNavigationProvider.notifier).state = 1;
             },

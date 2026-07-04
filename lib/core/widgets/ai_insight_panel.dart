@@ -20,37 +20,30 @@ class AiInsightPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Color primaryColor = AppColors.info;
-    Color bgColor = AppColors.infoLight;
+    final t = AppColors.of(context);
+    Color primaryColor = t.brandPrimary;
     IconData icon = Icons.psychology_rounded;
 
     if (type == 'warning') {
-      primaryColor = AppColors.warning;
-      bgColor = AppColors.warningLight;
+      primaryColor = t.warning;
       icon = Icons.bolt_rounded;
     } else if (type == 'danger') {
-      primaryColor = AppColors.danger;
-      bgColor = AppColors.dangerLight;
+      primaryColor = t.danger;
       icon = Icons.warning_amber_rounded;
     } else if (type == 'success') {
-      primaryColor = AppColors.success;
-      bgColor = AppColors.successLight;
+      primaryColor = t.success;
       icon = Icons.check_circle_outline_rounded;
     }
 
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [bgColor, bgColor.withOpacity(0.4)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: primaryColor.withOpacity(0.2)),
+        color: t.bgCard,
+        borderRadius: BorderRadius.circular(AppColors.radius),
+        border: Border.all(color: primaryColor.withValues(alpha: 0.2)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.01),
+            color: Colors.black.withValues(alpha: t.isDark ? 0.15 : 0.03),
             blurRadius: 8,
             offset: const Offset(0, 4),
           )
@@ -65,9 +58,9 @@ class AiInsightPanel extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: primaryColor.withOpacity(0.1),
+                  color: primaryColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: primaryColor.withOpacity(0.2)),
+                  border: Border.all(color: primaryColor.withValues(alpha: 0.2)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -93,7 +86,7 @@ class AiInsightPanel extends StatelessWidget {
           Text(
             title,
             style: GoogleFonts.outfit(
-              color: AppColors.textPrimary,
+              color: t.textPrimary,
               fontSize: 16,
               fontWeight: FontWeight.bold,
             ),
@@ -102,7 +95,7 @@ class AiInsightPanel extends StatelessWidget {
           Text(
             description,
             style: GoogleFonts.inter(
-              color: AppColors.textSecondary,
+              color: t.textSecondary,
               fontSize: 13,
               height: 1.4,
             ),
@@ -112,7 +105,7 @@ class AiInsightPanel extends StatelessWidget {
             Text(
               'Recommended Actions:',
               style: GoogleFonts.inter(
-                color: AppColors.textPrimary,
+                color: t.textPrimary,
                 fontSize: 12,
                 fontWeight: FontWeight.bold,
               ),
@@ -139,7 +132,7 @@ class AiInsightPanel extends StatelessWidget {
                         child: Text(
                           rec,
                           style: GoogleFonts.inter(
-                            color: AppColors.textSecondary,
+                            color: t.textSecondary,
                             fontSize: 12,
                             height: 1.3,
                           ),

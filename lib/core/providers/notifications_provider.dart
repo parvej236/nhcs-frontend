@@ -7,7 +7,7 @@ class AppNotification {
   final String timestamp;
   final bool isRead;
   final String type; // 'info', 'warning', 'danger', 'success'
-  final String actionRoute; // e.g. '/user', '/doctor', '/authority', '/government'
+  final String actionRoute; // e.g. '/user', '/doctor', '/authority'
   final int actionTab; // Target sidebar index tab
 
   const AppNotification({
@@ -115,27 +115,6 @@ class NotificationsNotifier extends StateNotifier<List<AppNotification>> {
           actionTab: 5, // Pharmacy inventory
         ),
       ];
-    } else if (role == 'GOVT') {
-      state = [
-        const AppNotification(
-          id: 'ng1',
-          title: 'Dengue Case Outbreak Warning',
-          description: 'Weekly surveillance flags Dengue spike threshold limits exceeded in Dhaka North.',
-          timestamp: '2 hours ago',
-          type: 'danger',
-          actionRoute: '/government',
-          actionTab: 2, // Disease intelligence page
-        ),
-        const AppNotification(
-          id: 'ng2',
-          title: 'Pending Compliance Review',
-          description: 'Khulna District Hospital compliance score updated. Review licensing status.',
-          timestamp: '1 day ago',
-          type: 'warning',
-          actionRoute: '/government',
-          actionTab: 4, // Compliance center page
-        ),
-      ];
     }
   }
 
@@ -167,8 +146,4 @@ final doctorNotificationsProvider = StateNotifierProvider<NotificationsNotifier,
 
 final hospitalNotificationsProvider = StateNotifierProvider<NotificationsNotifier, List<AppNotification>>((ref) {
   return NotificationsNotifier('HOSPITAL');
-});
-
-final govtNotificationsProvider = StateNotifierProvider<NotificationsNotifier, List<AppNotification>>((ref) {
-  return NotificationsNotifier('GOVT');
 });

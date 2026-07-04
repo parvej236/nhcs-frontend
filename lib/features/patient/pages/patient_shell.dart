@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/widgets/sidebar.dart';
+import '../../public/widgets/public_sections.dart';
 import '../presentation/providers/patient_providers.dart';
 import 'patient_dashboard_page.dart';
 import 'health_timeline_page.dart';
@@ -11,13 +12,18 @@ import 'patient_profile_page.dart';
 class PatientShell extends ConsumerWidget {
   const PatientShell({super.key});
 
-  static const List<Widget> _pages = [
-    PatientDashboardPage(),
-    HealthTimelinePage(),
-    AppointmentsPage(),
-    MedicalVaultPage(),
-    PatientProfilePage(),
-    Center(child: Text('AI Assistant — Coming Soon')),
+  static final List<Widget> _pages = [
+    const PatientDashboardPage(),
+    const HealthTimelinePage(),
+    const AppointmentsPage(),
+    const MedicalVaultPage(),
+    const PatientProfilePage(),
+    const Padding(
+      padding: EdgeInsets.all(24.0),
+      child: SingleChildScrollView(
+        child: VitalsChecker(),
+      ),
+    ),
   ];
 
   @override
