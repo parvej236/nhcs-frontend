@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/providers/language_provider.dart';
 import '../presentation/providers/doctor_providers.dart';
 
 class DoctorSchedulePage extends ConsumerStatefulWidget {
@@ -12,13 +13,43 @@ class DoctorSchedulePage extends ConsumerStatefulWidget {
 }
 
 class _DoctorSchedulePageState extends ConsumerState<DoctorSchedulePage> {
-  String _selectedDay = 'Monday';
-  final List<String> _weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+  late final List<DateTime> _dates;
+  late DateTime _selectedDate;
+
+  @override
+  void initState() {
+    super.initState();
+    // Generate next 7 days starting from today
+    _dates = List.generate(7, (i) => DateTime.now().add(Duration(days: i)));
+    _selectedDate = _dates.first;
+  }
+
+  String _getWeekdayName(int weekday) {
+    switch (weekday) {
+      case DateTime.monday:
+        return 'Monday';
+      case DateTime.tuesday:
+        return 'Tuesday';
+      case DateTime.wednesday:
+        return 'Wednesday';
+      case DateTime.thursday:
+        return 'Thursday';
+      case DateTime.friday:
+        return 'Friday';
+      case DateTime.saturday:
+        return 'Saturday';
+      case DateTime.sunday:
+        return 'Sunday';
+      default:
+        return '';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Watch slots for the selected day
-    final slotsAsync = ref.watch(doctorScheduleProvider(_selectedDay));
+    final tr = ref.watch(translationsProvider);
+    final selectedDayName = _getWeekdayName(_selectedDate.weekday);
+    final slotsAsync = ref.watch(doctorScheduleProvider(selectedDayName));
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -30,10 +61,24 @@ class _DoctorSchedulePageState extends ConsumerState<DoctorSchedulePage> {
             color: AppColors.surface,
             child: Row(
               children: [
-                Text('My Schedule', style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold)),
+                Text(tr('doctor_my_schedule'), style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold)),
+                const SizedBox(width: 12),
+                IconButton(
+                  icon: const Icon(Icons.refresh_rounded, color: AppColors.primary),
+                  tooltip: tr('doctor_reload_schedule'),
+                  onPressed: () {
+                    ref.invalidate(doctorScheduleProvider(selectedDayName));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(tr('doctor_schedule_reloaded')), duration: const Duration(seconds: 1)),
+                    );
+                  },
+                ),
                 const Spacer(),
                 IconButton(icon: const Icon(Icons.chevron_left_rounded), onPressed: () {}),
-                Text('June 2026', style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w600)),
+                Text(
+                  '${tr('doctor_month_${_selectedDate.month}')} ${_selectedDate.year}',
+                  style: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
                 IconButton(icon: const Icon(Icons.chevron_right_rounded), onPressed: () {}),
               ],
             ),
@@ -44,13 +89,17 @@ class _DoctorSchedulePageState extends ConsumerState<DoctorSchedulePage> {
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             color: AppColors.surface,
             child: Row(
-              children: _weekdays.map((day) {
-                final isSelected = _selectedDay == day;
+              children: _dates.map((date) {
+                final dayName = _getWeekdayName(date.weekday);
+                final isSelected = _selectedDate.year == date.year &&
+                    _selectedDate.month == date.month &&
+                    _selectedDate.day == date.day;
+
                 return Expanded(
                   child: InkWell(
                     onTap: () {
                       setState(() {
-                        _selectedDay = day;
+                        _selectedDate = date;
                       });
                     },
                     borderRadius: BorderRadius.circular(12),
@@ -67,7 +116,7 @@ class _DoctorSchedulePageState extends ConsumerState<DoctorSchedulePage> {
                       child: Column(
                         children: [
                           Text(
-                            day.substring(0, 3),
+                            dayName.substring(0, 3),
                             style: GoogleFonts.inter(
                               fontSize: 12,
                               fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
@@ -76,7 +125,7 @@ class _DoctorSchedulePageState extends ConsumerState<DoctorSchedulePage> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            _getDateForDay(day),
+                            date.day.toString(),
                             style: GoogleFonts.inter(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
@@ -98,7 +147,7 @@ class _DoctorSchedulePageState extends ConsumerState<DoctorSchedulePage> {
             child: slotsAsync.when(
               data: (slots) {
                 if (slots.isEmpty) {
-                  return const Center(child: Text('No slots scheduled for this day.'));
+                  return Center(child: Text(tr('doctor_no_appointments_day')));
                 }
 
                 return ListView.builder(
@@ -106,20 +155,18 @@ class _DoctorSchedulePageState extends ConsumerState<DoctorSchedulePage> {
                   itemCount: slots.length,
                   itemBuilder: (context, index) {
                     final slot = slots[index];
-                    final patient = _getPatientForSlot(_selectedDay, slot);
-                    
+
                     return _scheduleItem(
-                      slot,
-                      patient['name']!,
-                      patient['type']!,
-                      patient['dept']!,
-                      isEmpty: patient['name'] == 'Available Slot',
+                      slot.time,
+                      slot.patientName,
+                      slot.visitType,
+                      slot.department,
                     );
                   },
                 );
               },
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (err, _) => Center(child: Text('Error loading schedule: $err')),
+              loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+              error: (err, _) => Center(child: Text('${tr('doctor_error_loading_schedule')} $err', style: const TextStyle(color: AppColors.danger))),
             ),
           ),
         ],
@@ -127,44 +174,8 @@ class _DoctorSchedulePageState extends ConsumerState<DoctorSchedulePage> {
     );
   }
 
-  String _getDateForDay(String day) {
-    switch (day) {
-      case 'Monday':
-        return '16';
-      case 'Tuesday':
-        return '17';
-      case 'Wednesday':
-        return '18';
-      case 'Thursday':
-        return '19';
-      case 'Friday':
-        return '20';
-      default:
-        return '16';
-    }
-  }
-
-  Map<String, String> _getPatientForSlot(String day, String slot) {
-    if (day == 'Monday') {
-      if (slot == '08:00 AM') {
-        return {'name': 'Rahim Islam', 'type': 'Follow-up', 'dept': 'Cardiology'};
-      }
-      if (slot == '08:30 AM') {
-        return {'name': 'Karim Ullah', 'type': 'Referral', 'dept': 'Cardiology'};
-      }
-      if (slot == '09:00 AM') {
-        return {'name': 'Tahmina Akhtar', 'type': 'First Consultation', 'dept': 'Cardiology'};
-      }
-      if (slot == '09:30 AM') {
-        return {'name': 'Abdul Khalek', 'type': 'Emergency', 'dept': 'Cardiology'};
-      }
-    }
-    
-    // Default fallback to available
-    return {'name': 'Available Slot', 'type': '', 'dept': ''};
-  }
-
   Widget _scheduleItem(String time, String patient, String type, String dept, {bool isEmpty = false}) {
+    final tr = ref.read(translationsProvider);
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
@@ -198,7 +209,7 @@ class _DoctorSchedulePageState extends ConsumerState<DoctorSchedulePage> {
               decoration: BoxDecoration(color: AppColors.primaryLight, borderRadius: BorderRadius.circular(10)),
               child: Center(
                 child: Text(
-                  patient[0],
+                  patient.isNotEmpty ? patient[0] : 'P',
                   style: GoogleFonts.outfit(color: AppColors.primary, fontWeight: FontWeight.bold),
                 ),
               ),
@@ -227,7 +238,7 @@ class _DoctorSchedulePageState extends ConsumerState<DoctorSchedulePage> {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                'Available Slot — Click to block',
+                tr('doctor_available_slot'),
                 style: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 13, fontStyle: FontStyle.italic),
               ),
             ),

@@ -15,7 +15,7 @@ class DoctorMockDatasource {
     emergencyCases: 2,
     pendingReports: 5,
     referredCases: 3,
-    aiBriefing: "Good morning Dr. Ahmed. Today you have 18 consultations, including 8 diabetes follow-ups, 2 cardiac emergency reviews, and 3 referrals from local general practitioners. Your first patient is Rahim Islam, scheduled at 08:00 AM, who has a history of Type 2 Diabetes and Hypertension, showing elevated blood glucose trends.",
+    aiBriefing: "Today you have 18 consultations, including 8 diabetes follow-ups, 2 cardiac emergency reviews, and 3 referrals from local general practitioners. Your first patient is Rahim Islam, scheduled at 08:00 AM, who has a history of Type 2 Diabetes and Hypertension, showing elevated blood glucose trends.",
   );
 
   // 2. Patient Queue
@@ -133,16 +133,7 @@ class DoctorMockDatasource {
     ),
   ];
 
-  // 4. Doctor Weekly Schedule slots
-  final Map<String, List<String>> scheduleSlots = {
-    'Monday': ['08:00 AM', '08:30 AM', '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '02:00 PM', '02:30 PM', '03:00 PM'],
-    'Tuesday': ['08:00 AM', '08:30 AM', '09:00 AM', '09:30 AM', '10:00 AM', '02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM', '04:00 PM'],
-    'Wednesday': ['08:00 AM', '08:30 AM', '09:00 AM', '09:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '02:00 PM', '02:30 PM', '03:00 PM'],
-    'Thursday': ['08:00 AM', '08:30 AM', '09:00 AM', '09:30 AM', '10:00 AM', '02:00 PM', '02:30 PM', '03:00 PM', '03:30 PM', '04:00 PM'],
-    'Friday': ['08:00 AM', '08:30 AM', '09:00 AM', '09:30 AM', '10:00 AM'],
-  };
-
-  // 5. Submitted Clinical Cases (Saved history)
+  // 4. Submitted Clinical Cases (Saved history)
   final List<TreatmentPlan> submittedTreatmentPlans = [];
 
   void addTreatmentPlan(TreatmentPlan plan) {

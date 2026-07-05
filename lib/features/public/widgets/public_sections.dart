@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_primitives.dart';
 import '../../../core/providers/public_providers.dart';
+import '../../../core/providers/language_provider.dart';
 
 // Horizontal page gutter used across the marketing site.
 const double _gutter = 40;
@@ -81,6 +82,7 @@ class WebHero extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppColors.of(context);
+    final tr = ref.watch(translationsProvider);
     final statsAsync = ref.watch(publicStatsProvider);
 
     final copy = Column(
@@ -94,7 +96,7 @@ class WebHero extends ConsumerWidget {
             borderRadius: BorderRadius.circular(30),
           ),
           child: Text(
-            'Real-time Clinical Sync Engine Active',
+            tr('hero_badge'),
             style: GoogleFonts.inter(
               color: t.brandPrimary,
               fontSize: 13,
@@ -112,19 +114,18 @@ class WebHero extends ConsumerWidget {
               color: t.textPrimary,
             ),
             children: [
-              const TextSpan(text: 'Smart Health Hub:\n'),
+              TextSpan(text: '${tr('hero_title_line1')}\n'),
               TextSpan(
-                text: 'Universal Digital Health',
+                text: tr('hero_title_highlight'),
                 style: TextStyle(color: t.brandPrimary),
               ),
-              const TextSpan(text: ' for Everyone'),
+              TextSpan(text: tr('hero_title_tail')),
             ],
           ),
         ),
         const SizedBox(height: 20),
         Text(
-          'An AI-powered central medical registry providing real-time vital '
-          'analysis, doctor queue tracking, and secure digital prescription access.',
+          tr('hero_subtitle'),
           style: GoogleFonts.inter(
             fontSize: 17,
             height: 1.6,
@@ -136,9 +137,9 @@ class WebHero extends ConsumerWidget {
           spacing: 16,
           runSpacing: 12,
           children: [
-            AppButton(label: 'Run Vitals Check', onPressed: onRunVitals),
+            AppButton(label: tr('hero_btn_vitals'), onPressed: onRunVitals),
             AppButton(
-              label: 'Search for Doctor',
+              label: tr('hero_btn_search'),
               onPressed: onSearchDoctor,
               variant: AppButtonVariant.secondary,
             ),
@@ -158,7 +159,7 @@ class WebHero extends ConsumerWidget {
               Icon(Icons.monitor_heart_outlined, color: t.brandPrimary, size: 22),
               const SizedBox(width: 8),
               Text(
-                'NHCS Live Tracker',
+                tr('tracker_title'),
                 style: GoogleFonts.inter(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
@@ -171,29 +172,29 @@ class WebHero extends ConsumerWidget {
           statsAsync.when(
             data: (stats) => Column(
               children: [
-                _trackerRow(context, 'Active Registries', '${stats['patients'] ?? 0} Patients'),
+                _trackerRow(context, tr('tracker_registries'), '${stats['patients'] ?? 0} ${tr('tracker_patients')}'),
                 const SizedBox(height: 14),
-                _trackerRow(context, 'Hospitals Affiliated', '${stats['hospitals'] ?? 0} Centres'),
+                _trackerRow(context, tr('tracker_hospitals'), '${stats['hospitals'] ?? 0} ${tr('tracker_centres')}'),
                 const SizedBox(height: 14),
-                _trackerRow(context, 'Specialists Online', '${stats['doctors'] ?? 0} Doctors'),
+                _trackerRow(context, tr('tracker_specialists'), '${stats['doctors'] ?? 0} ${tr('tracker_doctors')}'),
               ],
             ),
             loading: () => Column(
               children: [
-                _trackerRow(context, 'Active Registries', '...'),
+                _trackerRow(context, tr('tracker_registries'), '...'),
                 const SizedBox(height: 14),
-                _trackerRow(context, 'Hospitals Affiliated', '...'),
+                _trackerRow(context, tr('tracker_hospitals'), '...'),
                 const SizedBox(height: 14),
-                _trackerRow(context, 'Specialists Online', '...'),
+                _trackerRow(context, tr('tracker_specialists'), '...'),
               ],
             ),
             error: (err, stack) => Column(
               children: [
-                _trackerRow(context, 'Active Registries', 'Error'),
+                _trackerRow(context, tr('tracker_registries'), 'Error'),
                 const SizedBox(height: 14),
-                _trackerRow(context, 'Hospitals Affiliated', 'Error'),
+                _trackerRow(context, tr('tracker_hospitals'), 'Error'),
                 const SizedBox(height: 14),
-                _trackerRow(context, 'Specialists Online', 'Error'),
+                _trackerRow(context, tr('tracker_specialists'), 'Error'),
               ],
             ),
           ),
@@ -209,9 +210,11 @@ class WebHero extends ConsumerWidget {
           decoration: BoxDecoration(
             gradient: RadialGradient(
               center: Alignment.topRight,
-              radius: 1.1,
-              colors: [t.brandPrimary.withValues(alpha: 0.14), t.bgCard],
-              stops: const [0.0, 0.6],
+              radius: 1.3,
+              colors: t.isDark
+                  ? [const Color(0xFFB91C1C).withValues(alpha: 0.22), t.bgCard]
+                  : [const Color(0xFFFEE2E2).withValues(alpha: 0.8), t.bgCard],
+              stops: const [0.0, 0.8],
             ),
             borderRadius: BorderRadius.circular(AppColors.radius),
             border: Border.all(color: t.border),
@@ -266,6 +269,7 @@ class StatRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final statsAsync = ref.watch(publicStatsProvider);
+    final tr = ref.watch(translationsProvider);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(_gutter, 0, _gutter, 40),
@@ -274,25 +278,25 @@ class StatRow extends ConsumerWidget {
           data: (stats) => _ResponsiveGrid(
             columns: 3,
             children: [
-              _StatCard(value: '${stats['patients'] ?? 0}', label: 'Patients Seeded'),
-              _StatCard(value: '${stats['doctors'] ?? 0}', label: 'Verified Specialists'),
-              _StatCard(value: '${stats['hospitals'] ?? 0}', label: 'Active Medical Facilities'),
+              _StatCard(value: '${stats['patients'] ?? 0}', label: tr('stat_patients')),
+              _StatCard(value: '${stats['doctors'] ?? 0}', label: tr('stat_specialists')),
+              _StatCard(value: '${stats['hospitals'] ?? 0}', label: tr('stat_facilities')),
             ],
           ),
           loading: () => _ResponsiveGrid(
             columns: 3,
-            children: const [
-              _StatCard(value: '...', label: 'Patients Seeded'),
-              _StatCard(value: '...', label: 'Verified Specialists'),
-              _StatCard(value: '...', label: 'Active Medical Facilities'),
+            children: [
+              _StatCard(value: '...', label: tr('stat_patients')),
+              _StatCard(value: '...', label: tr('stat_specialists')),
+              _StatCard(value: '...', label: tr('stat_facilities')),
             ],
           ),
           error: (err, stack) => _ResponsiveGrid(
             columns: 3,
-            children: const [
-              _StatCard(value: 'Error', label: 'Patients Seeded'),
-              _StatCard(value: 'Error', label: 'Verified Specialists'),
-              _StatCard(value: 'Error', label: 'Active Medical Facilities'),
+            children: [
+              _StatCard(value: 'Error', label: tr('stat_patients')),
+              _StatCard(value: 'Error', label: tr('stat_specialists')),
+              _StatCard(value: 'Error', label: tr('stat_facilities')),
             ],
           ),
         ),
@@ -480,7 +484,7 @@ class _VitalsCheckerState extends ConsumerState<VitalsChecker> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _sectionTitle(context, 'Clinical Vitals Risk Analyzer', center: false),
+            _sectionTitle(context, ref.watch(translationsProvider)('section_vitals_analyzer'), center: false),
             const SizedBox(height: 24),
             _ResponsiveGrid(columns: 2, spacing: 30, children: [input, resultCard]),
           ],
@@ -1107,7 +1111,7 @@ class EmergencyBloodRequest extends StatelessWidget {
 // ---------------------------------------------------------------------------
 // 6. Live Donor Availability
 // ---------------------------------------------------------------------------
-class LiveDonorAvailability extends StatelessWidget {
+class LiveDonorAvailability extends ConsumerWidget {
   const LiveDonorAvailability({super.key});
 
   void _showDonorDetails(BuildContext context, String hubName) {
@@ -1331,8 +1335,9 @@ class LiveDonorAvailability extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final t = AppColors.of(context);
+    final tr = ref.watch(translationsProvider);
     final hubs = [
       ('Dhaka Central Hub', '92%', 'Awaiting product configuration & matching', t.success),
       ('Chittagong Zone', '68%', 'Collection status & verification active', t.warning),
@@ -1344,10 +1349,10 @@ class LiveDonorAvailability extends StatelessWidget {
       child: _MaxWidth(
         child: Column(
           children: [
-            _sectionTitle(context, 'Live Donor Availability'),
+            _sectionTitle(context, tr('section_donor_availability')),
             const SizedBox(height: 6),
             Text(
-              'Real-time predictions for hospital hubs',
+              tr('donor_subtitle'),
               style: GoogleFonts.inter(fontSize: 14, color: t.textSecondary),
             ),
             const SizedBox(height: 24),
@@ -1384,7 +1389,7 @@ class LiveDonorAvailability extends StatelessWidget {
                         ),
                         const SizedBox(height: 16),
                         AppButton(
-                          label: 'View Details',
+                          label: tr('view_details'),
                           onPressed: () => _showDonorDetails(context, hub.$1),
                           variant: AppButtonVariant.outline,
                           expand: true,
@@ -1404,27 +1409,28 @@ class LiveDonorAvailability extends StatelessWidget {
 // ---------------------------------------------------------------------------
 // 7. Our Solutions
 // ---------------------------------------------------------------------------
-class OurSolutions extends StatelessWidget {
+class OurSolutions extends ConsumerWidget {
   const OurSolutions({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final t = AppColors.of(context);
+    final tr = ref.watch(translationsProvider);
     final solutions = [
       (
         Icons.monitor_heart_outlined,
-        'Digital Vitals Risk Analyzer',
-        'AI-powered immediate cardiac & diabetic symptom analysis and severity warnings.'
+        tr('sol1_title'),
+        tr('sol1_desc'),
       ),
       (
         Icons.favorite_border,
-        'Universal Health Card ID',
-        'One-click patient health profile & emergency ICE contact QR code registry.'
+        tr('sol2_title'),
+        tr('sol2_desc'),
       ),
       (
         Icons.person_outline,
-        'Active Doctor Queue Sync',
-        'Links hospital arrivals check-in directly to specialist clinical workspaces.'
+        tr('sol3_title'),
+        tr('sol3_desc'),
       ),
     ];
 
@@ -1433,7 +1439,7 @@ class OurSolutions extends StatelessWidget {
       child: _MaxWidth(
         child: Column(
           children: [
-            _sectionTitle(context, 'Our Solutions'),
+            _sectionTitle(context, tr('section_solutions')),
             const SizedBox(height: 32),
             _ResponsiveGrid(
               columns: 3,
@@ -1473,7 +1479,7 @@ class OurSolutions extends StatelessWidget {
                         ),
                         const SizedBox(height: 14),
                         Text(
-                          'Learn More  ➔',
+                          tr('learn_more'),
                           style: GoogleFonts.inter(
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
@@ -1495,22 +1501,23 @@ class OurSolutions extends StatelessWidget {
 // ---------------------------------------------------------------------------
 // 8. Success Stories
 // ---------------------------------------------------------------------------
-class SuccessStories extends StatelessWidget {
+class SuccessStories extends ConsumerWidget {
   const SuccessStories({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final t = AppColors.of(context);
+    final tr = ref.watch(translationsProvider);
     final stories = [
       (
         Icons.bloodtype_outlined,
-        'জরুরি রক্ত সহায়তা (মাসুদ রানা - চুয়েট, রাউজান)',
-        '"চুয়েট, রাউজান, চট্টগ্রামের মাসুদ রানা ভাইয়ের ও+ রক্তের জরুরি প্রয়োজন ছিল। NHCS AI ব্লাড ম্যাচিং সিস্টেমের মাধ্যমে মাত্র কয়েক মিনিটে চট্টগ্রামের স্থানীয় একজন দাতা খুঁজে পাওয়া যায় এবং সফলভাবে রক্ত প্রদান সম্পন্ন হয়। এটি সত্যিই একটি জীবন রক্ষাকারী অভিজ্ঞতা!"'
+        tr('story1_title'),
+        tr('story1_body'),
       ),
       (
         Icons.check_circle_outline,
-        'সহজ ডাক্তার অ্যাপয়েন্টমেন্ট (শওকত ভূঁইয়া)',
-        '"আমি আমার রোগের লক্ষণ লিখে সার্চ করতেই NHCS এর এআই অ্যাসিস্ট্যান্ট সরাসরি সঠিক ডক্টর খুঁজে দিয়েছে। ডক্টর খোঁজার কোনো ঝামেলাই পোহাতে হয়নি, খুব সহজেই অ্যাপয়েন্টমেন্ট বুকিং করতে পেরেছি। ধন্যবাদ NHCS!"'
+        tr('story2_title'),
+        tr('story2_body'),
       ),
     ];
 
@@ -1519,7 +1526,7 @@ class SuccessStories extends StatelessWidget {
       child: _MaxWidth(
         child: Column(
           children: [
-            _sectionTitle(context, 'Success Stories'),
+            _sectionTitle(context, tr('section_success')),
             const SizedBox(height: 32),
             _ResponsiveGrid(
               columns: 2,
@@ -1571,13 +1578,14 @@ class SuccessStories extends StatelessWidget {
 // ---------------------------------------------------------------------------
 // 9. Health Blog Hub
 // ---------------------------------------------------------------------------
-class HealthBlogHub extends StatelessWidget {
+class HealthBlogHub extends ConsumerWidget {
   final VoidCallback onReadArticle;
   const HealthBlogHub({super.key, required this.onReadArticle});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final t = AppColors.of(context);
+    final tr = ref.watch(translationsProvider);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(_gutter, 0, _gutter, 40),
@@ -1585,7 +1593,7 @@ class HealthBlogHub extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _sectionTitle(context, 'NHCS AI Health Insights (Blog Hub)', center: false),
+            _sectionTitle(context, tr('section_blog'), center: false),
             const SizedBox(height: 24),
             _ResponsiveGrid(
               columns: 2,

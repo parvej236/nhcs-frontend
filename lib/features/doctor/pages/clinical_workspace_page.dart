@@ -2,17 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/providers/language_provider.dart';
+import '../../../core/dev/judge_dummy_data.dart';
+import '../../../core/providers/doctor_queue_provider.dart';
+import '../../../core/widgets/judge_dummy_field.dart';
 import '../../../core/widgets/ai_insight_panel.dart';
 import '../../patient/data/models/patient_profile.dart';
 import '../presentation/providers/doctor_providers.dart';
 import '../presentation/providers/clinical_workspace_provider.dart';
-import '../data/models/clinical_case.dart';
 
 class ClinicalWorkspacePage extends ConsumerStatefulWidget {
   const ClinicalWorkspacePage({super.key});
 
   @override
-  ConsumerState<ClinicalWorkspacePage> createState() => _ClinicalWorkspacePageState();
+  ConsumerState<ClinicalWorkspacePage> createState() =>
+      _ClinicalWorkspacePageState();
 }
 
 class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
@@ -20,18 +24,21 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
   final TextEditingController _symptomController = TextEditingController();
   final TextEditingController _diseaseController = TextEditingController();
   final TextEditingController _diseaseNotesController = TextEditingController();
-  
+
   final TextEditingController _medNameController = TextEditingController();
   final TextEditingController _medDosageController = TextEditingController();
   final TextEditingController _medDurationController = TextEditingController();
-  final TextEditingController _medInstructionsController = TextEditingController();
-  
+  final TextEditingController _medInstructionsController =
+      TextEditingController();
+
   final TextEditingController _notesController = TextEditingController();
-  final TextEditingController _followUpController = TextEditingController(text: 'In 2 weeks');
+  final TextEditingController _followUpController = TextEditingController(
+    text: 'In 2 weeks',
+  );
   final TextEditingController _referralController = TextEditingController();
 
   String _diagnosisStatus = 'Provisional';
-  
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -50,9 +57,10 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
 
   @override
   Widget build(BuildContext context) {
+    final tr = ref.watch(translationsProvider);
     final workspaceState = ref.watch(clinicalWorkspaceProvider);
     final patientId = workspaceState.patientId;
-    
+
     // Watch patient profile if selected
     final patientProfileAsync = ref.watch(patientSearchProvider(patientId));
 
@@ -61,14 +69,16 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
       if (next.isSuccess) {
         // Show success alert
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Treatment plan submitted successfully and synced to patient records!'),
+          SnackBar(
+            content: Text(
+              tr('doctor_treatment_submitted'),
+            ),
             backgroundColor: AppColors.success,
           ),
         );
         // Refresh dashboard and queue
         ref.invalidate(doctorDashboardProvider);
-        ref.invalidate(patientQueueProvider);
+        ref.read(doctorQueueProvider.notifier).removeByHealthId(next.patientId);
         // Reset workspace
         ref.read(clinicalWorkspaceProvider.notifier).reset();
         // Go back to dashboard
@@ -94,21 +104,54 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
             color: AppColors.surface,
             child: Row(
               children: [
-                Text('Clinical Workspace', style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold)),
+                Text(
+                  tr('doctor_clinical_workspace_title'),
+                  style: GoogleFonts.outfit(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.refresh_rounded, color: AppColors.primary),
+                  tooltip: tr('doctor_reload_workspace'),
+                  onPressed: () {
+                    final patientId = workspaceState.patientId;
+                    if (patientId.isNotEmpty) {
+                      ref.invalidate(patientSearchProvider(patientId));
+                    }
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(tr('doctor_workspace_reloaded')), duration: const Duration(seconds: 1)),
+                    );
+                  },
+                ),
                 const SizedBox(width: 16),
                 if (workspaceState.patientName.isNotEmpty)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(color: AppColors.primaryLight, borderRadius: BorderRadius.circular(8)),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryLight,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                     child: Text(
-                      'Active Patient: ${workspaceState.patientName}',
-                      style: GoogleFonts.inter(color: AppColors.primary, fontSize: 13, fontWeight: FontWeight.w600),
+                      '${tr('doctor_active_patient_prefix')} ${workspaceState.patientName}',
+                      style: GoogleFonts.inter(
+                        color: AppColors.primary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   )
                 else
                   Text(
-                    '• Select a patient from the queue or search below',
-                    style: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 13),
+                    tr('doctor_select_patient_hint'),
+                    style: GoogleFonts.inter(
+                      color: AppColors.textMuted,
+                      fontSize: 13,
+                    ),
                   ),
                 const Spacer(),
                 if (patientId.isNotEmpty) ...[
@@ -119,22 +162,75 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
                       _followUpController.text = 'In 2 weeks';
                       _referralController.clear();
                     },
-                    child: Text('Cancel', style: GoogleFonts.inter(color: AppColors.textSecondary)),
+                    child: Text(
+                      tr('doctor_cancel'),
+                      style: GoogleFonts.inter(color: AppColors.textSecondary),
+                    ),
                   ),
                   const SizedBox(width: 12),
                   ElevatedButton.icon(
                     onPressed: workspaceState.isSubmitting
                         ? null
                         : () {
-                            ref.read(clinicalWorkspaceProvider.notifier).updateClinicalNotes(_notesController.text);
-                            ref.read(clinicalWorkspaceProvider.notifier).updateFollowUp(_followUpController.text);
-                            ref.read(clinicalWorkspaceProvider.notifier).updateReferral(_referralController.text.isEmpty ? null : _referralController.text);
-                            ref.read(clinicalWorkspaceProvider.notifier).submit();
+                            final notifier =
+                                ref.read(clinicalWorkspaceProvider.notifier);
+
+                            // Flush any typed-but-not-yet-"Added" inputs so
+                            // nothing the doctor entered is silently dropped on
+                            // submit. Without this, a medicine/diagnosis/symptom
+                            // left in its text field (never added to the list)
+                            // would be lost and the prescription would arrive
+                            // empty in the patient's Medical Vault.
+                            if (_symptomController.text.trim().isNotEmpty) {
+                              notifier.addSymptom(_symptomController.text.trim());
+                              _symptomController.clear();
+                            }
+                            if (_diseaseController.text.trim().isNotEmpty) {
+                              notifier.addDiagnosis(
+                                _diseaseController.text.trim(),
+                                _diagnosisStatus,
+                                _diseaseNotesController.text.trim(),
+                              );
+                              _diseaseController.clear();
+                              _diseaseNotesController.clear();
+                            }
+                            if (_medNameController.text.trim().isNotEmpty) {
+                              notifier.addMedicine(
+                                _medNameController.text.trim(),
+                                _medDosageController.text.trim(),
+                                _medDurationController.text.trim(),
+                                _medInstructionsController.text.trim(),
+                              );
+                              _medNameController.clear();
+                              _medDosageController.clear();
+                              _medDurationController.clear();
+                              _medInstructionsController.clear();
+                            }
+
+                            notifier.updateClinicalNotes(_notesController.text);
+                            notifier.updateFollowUp(_followUpController.text);
+                            notifier.updateReferral(
+                              _referralController.text.isEmpty
+                                  ? null
+                                  : _referralController.text,
+                            );
+                            notifier.submit();
                           },
                     icon: workspaceState.isSubmitting
-                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
                         : const Icon(Icons.check_circle_rounded, size: 18),
-                    label: Text(workspaceState.isSubmitting ? 'Submitting...' : 'Submit Treatment'),
+                    label: Text(
+                      workspaceState.isSubmitting
+                          ? tr('doctor_submitting')
+                          : tr('doctor_submit_treatment'),
+                    ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.success,
                       foregroundColor: Colors.white,
@@ -145,7 +241,7 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
               ],
             ),
           ),
-          
+
           Expanded(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -156,7 +252,11 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
                   child: Container(
                     decoration: BoxDecoration(
                       color: AppColors.background,
-                      border: Border(right: BorderSide(color: AppColors.divider.withOpacity(0.5))),
+                      border: Border(
+                        right: BorderSide(
+                          color: AppColors.divider.withOpacity(0.5),
+                        ),
+                      ),
                     ),
                     child: SingleChildScrollView(
                       padding: const EdgeInsets.all(24),
@@ -166,16 +266,21 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
                           // Search bar to lookup patients by ID
                           _buildPatientSearchBar(),
                           const SizedBox(height: 20),
-                          
+
                           if (patientId.isEmpty)
                             _buildNoPatientPlaceholder()
                           else
                             patientProfileAsync.when(
                               data: (profile) {
                                 if (profile == null) {
-                                  return const Text('Patient profile not found.');
+                                  return Text(
+                                    tr('doctor_patient_profile_not_found'),
+                                  );
                                 }
-                                return _buildPatientHistoryContent(profile, workspaceState);
+                                return _buildPatientHistoryContent(
+                                  profile,
+                                  workspaceState,
+                                );
                               },
                               loading: () => const Center(
                                 child: Padding(
@@ -183,14 +288,15 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
                                   child: CircularProgressIndicator(),
                                 ),
                               ),
-                              error: (err, _) => Text('Error loading profile: $err'),
+                              error: (err, _) =>
+                                  Text('${tr('doctor_error_loading_profile')} $err'),
                             ),
                         ],
                       ),
                     ),
                   ),
                 ),
-                
+
                 // RIGHT: Treatment Form
                 Expanded(
                   flex: 5,
@@ -199,8 +305,10 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
                     child: patientId.isEmpty
                         ? Center(
                             child: Text(
-                              'Select a patient to open clinical form.',
-                              style: GoogleFonts.inter(color: AppColors.textMuted),
+                              tr('doctor_select_patient_open_form'),
+                              style: GoogleFonts.inter(
+                                color: AppColors.textMuted,
+                              ),
                             ),
                           )
                         : SingleChildScrollView(
@@ -211,29 +319,32 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
                                 // Symptoms Section
                                 _buildSymptomsSection(workspaceState),
                                 const SizedBox(height: 24),
-                                
+
                                 // Diagnosis Section
                                 _buildDiagnosisSection(workspaceState),
                                 const SizedBox(height: 24),
-                                
+
                                 // Prescription Section
                                 _buildPrescriptionSection(workspaceState),
                                 const SizedBox(height: 24),
-                                
+
                                 // Investigations Section
                                 _buildInvestigationsSection(workspaceState),
                                 const SizedBox(height: 24),
-                                
+
                                 // Notes Section
                                 _buildNotesSection(),
                                 const SizedBox(height: 24),
-                                
+
                                 // Follow-up & Referral Section
                                 _buildFollowUpReferralSection(),
                                 const SizedBox(height: 24),
-                                
+
                                 // AI Alerts and Decision Support (Interactive Warnings!)
-                                _buildAiAlertsPanel(workspaceState, patientProfileAsync.value),
+                                _buildAiAlertsPanel(
+                                  workspaceState,
+                                  patientProfileAsync.value,
+                                ),
                               ],
                             ),
                           ),
@@ -248,44 +359,70 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
   }
 
   Widget _buildPatientSearchBar() {
+    final tr = ref.read(translationsProvider);
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.divider.withOpacity(0.5)),
       ),
-      child: TextField(
+      child: JudgeDummyField(
         controller: _searchController,
+        dummyValue:
+            JudgeDummyData.doctor_clinicalWorkspace_textField_patientSearchId,
         decoration: InputDecoration(
-          hintText: 'Enter National Health ID to retrieve records... (e.g. NUD-892-441-X7)',
-          prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textMuted),
+          hintText: tr('doctor_health_id_search_hint'),
+          prefixIcon: const Icon(
+            Icons.search_rounded,
+            color: AppColors.textMuted,
+          ),
           suffixIcon: IconButton(
-            icon: const Icon(Icons.arrow_forward_rounded, color: AppColors.primary),
+            icon: const Icon(
+              Icons.arrow_forward_rounded,
+              color: AppColors.primary,
+            ),
             onPressed: () {
               final id = _searchController.text.trim();
               if (id.isNotEmpty) {
-                ref.read(clinicalWorkspaceProvider.notifier).initializePatient('', id, 'Patient Profile');
+                ref
+                    .read(clinicalWorkspaceProvider.notifier)
+                    .initializePatient('', id, 'Patient Profile');
                 // Dynamically fetch patient details from datasource
-                ref.read(doctorRepositoryProvider).getPatientProfileByHealthId(id).then((p) {
-                  if (p != null) {
-                    ref.read(clinicalWorkspaceProvider.notifier).initializePatient('', id, p.name);
-                  }
-                });
+                ref
+                    .read(doctorRepositoryProvider)
+                    .getPatientProfileByHealthId(id)
+                    .then((p) {
+                      if (p != null) {
+                        ref
+                            .read(clinicalWorkspaceProvider.notifier)
+                            .initializePatient('', id, p.name);
+                      }
+                    });
               }
             },
           ),
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 12,
+          ),
         ),
         onSubmitted: (value) {
           final id = value.trim();
           if (id.isNotEmpty) {
-            ref.read(clinicalWorkspaceProvider.notifier).initializePatient('', id, 'Patient Profile');
-            ref.read(doctorRepositoryProvider).getPatientProfileByHealthId(id).then((p) {
-              if (p != null) {
-                ref.read(clinicalWorkspaceProvider.notifier).initializePatient('', id, p.name);
-              }
-            });
+            ref
+                .read(clinicalWorkspaceProvider.notifier)
+                .initializePatient('', id, 'Patient Profile');
+            ref
+                .read(doctorRepositoryProvider)
+                .getPatientProfileByHealthId(id)
+                .then((p) {
+                  if (p != null) {
+                    ref
+                        .read(clinicalWorkspaceProvider.notifier)
+                        .initializePatient('', id, p.name);
+                  }
+                });
           }
         },
       ),
@@ -293,6 +430,7 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
   }
 
   Widget _buildNoPatientPlaceholder() {
+    final tr = ref.read(translationsProvider);
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 80, horizontal: 20),
       decoration: BoxDecoration(
@@ -305,16 +443,33 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
           children: [
             Container(
               padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: AppColors.primaryLight, shape: BoxShape.circle),
-              child: const Icon(Icons.assignment_ind_rounded, size: 48, color: AppColors.primary),
+              decoration: BoxDecoration(
+                color: AppColors.primaryLight,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.assignment_ind_rounded,
+                size: 48,
+                color: AppColors.primary,
+              ),
             ),
             const SizedBox(height: 20),
-            Text('No Active Consultation', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(
+              tr('doctor_no_active_consultation'),
+              style: GoogleFonts.outfit(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const SizedBox(height: 8),
             Text(
-              'Select a patient from the queue in the Dashboard, or search using their National Unified Health ID to access their lifelong health history.',
+              tr('doctor_no_consultation_desc'),
               textAlign: TextAlign.center,
-              style: GoogleFonts.inter(color: AppColors.textSecondary, fontSize: 13, height: 1.5),
+              style: GoogleFonts.inter(
+                color: AppColors.textSecondary,
+                fontSize: 13,
+                height: 1.5,
+              ),
             ),
           ],
         ),
@@ -322,7 +477,11 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
     );
   }
 
-  Widget _buildPatientHistoryContent(PatientProfile profile, ClinicalWorkspaceState workspaceState) {
+  Widget _buildPatientHistoryContent(
+    PatientProfile profile,
+    ClinicalWorkspaceState workspaceState,
+  ) {
+    final tr = ref.read(translationsProvider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -352,8 +511,15 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
                   Container(
                     width: 52,
                     height: 52,
-                    decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(14)),
-                    child: const Icon(Icons.person_rounded, color: Colors.white, size: 30),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(
+                      Icons.person_rounded,
+                      color: Colors.white,
+                      size: 30,
+                    ),
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -362,25 +528,41 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
                       children: [
                         Text(
                           profile.name,
-                          style: GoogleFonts.outfit(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                          style: GoogleFonts.outfit(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'DOB: ${profile.dateOfBirth.day}/${profile.dateOfBirth.month}/${profile.dateOfBirth.year} (${2026 - profile.dateOfBirth.year} yrs) • ${profile.gender}',
-                          style: GoogleFonts.inter(color: Colors.white.withOpacity(0.85), fontSize: 12),
+                          '${tr('doctor_dob_prefix')} ${profile.dateOfBirth.day}/${profile.dateOfBirth.month}/${profile.dateOfBirth.year} (${2026 - profile.dateOfBirth.year} ${tr('doctor_years_short')}) • ${profile.gender}',
+                          style: GoogleFonts.inter(
+                            color: Colors.white.withOpacity(0.85),
+                            fontSize: 12,
+                          ),
                         ),
                       ],
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
-                      color: profile.bloodGroup == 'O+' ? AppColors.warning.withOpacity(0.3) : Colors.white24,
+                      color: profile.bloodGroup == 'O+'
+                          ? AppColors.warning.withOpacity(0.3)
+                          : Colors.white24,
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      'Blood: ${profile.bloodGroup}',
-                      style: GoogleFonts.inter(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                      '${tr('doctor_blood_prefix')} ${profile.bloodGroup}',
+                      style: GoogleFonts.inter(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ],
@@ -388,13 +570,28 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
               const SizedBox(height: 18),
               Container(
                 padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: Colors.white.withOpacity(0.08), borderRadius: BorderRadius.circular(10)),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(10),
+                ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    _summaryItem('Allergies', profile.allergies.isEmpty ? 'None' : profile.allergies.map((e) => e.allergen).join(', ')),
+                    _summaryItem(
+                      tr('doctor_allergies'),
+                      profile.allergies.isEmpty
+                          ? tr('doctor_none')
+                          : profile.allergies.map((e) => e.allergen).join(', '),
+                    ),
                     Container(width: 1, height: 24, color: Colors.white24),
-                    _summaryItem('Chronic Diseases', profile.chronicDiseases.isEmpty ? 'None' : profile.chronicDiseases.map((e) => e.diseaseName).join(', ')),
+                    _summaryItem(
+                      tr('doctor_chronic_diseases'),
+                      profile.chronicDiseases.isEmpty
+                          ? tr('doctor_none')
+                          : profile.chronicDiseases
+                                .map((e) => e.diseaseName)
+                                .join(', '),
+                    ),
                   ],
                 ),
               ),
@@ -402,16 +599,20 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
               Padding(
                 padding: const EdgeInsets.only(left: 4, top: 4),
                 child: Text(
-                  'Unified ID: ${profile.healthId}',
-                  style: GoogleFonts.inter(color: Colors.white.withOpacity(0.7), fontSize: 11, fontStyle: FontStyle.italic),
+                  '${tr('doctor_unified_id_prefix')} ${profile.healthId}',
+                  style: GoogleFonts.inter(
+                    color: Colors.white.withOpacity(0.7),
+                    fontSize: 11,
+                    fontStyle: FontStyle.italic,
+                  ),
                 ),
               ),
             ],
           ),
         ),
-        
+
         const SizedBox(height: 20),
-        
+
         // AI Clinical Overview Summary & Gemini Briefing Card
         Container(
           padding: const EdgeInsets.all(16),
@@ -426,19 +627,32 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.auto_awesome_rounded, color: AppColors.accent, size: 20),
+                  const Icon(
+                    Icons.auto_awesome_rounded,
+                    color: AppColors.accent,
+                    size: 20,
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('AI Clinical Overview', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.accent)),
+                        Text(
+                          tr('doctor_ai_clinical_overview'),
+                          style: GoogleFonts.inter(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: AppColors.accent,
+                          ),
+                        ),
                         const SizedBox(height: 6),
                         Text(
-                          profile.healthId == 'NUD-892-441-X7'
-                              ? 'Patient has been under treatment for diabetes for five years. Blood glucose levels have gradually increased during the last three visits. Medication compliance appears inconsistent. One follow-up appointment was missed.'
-                              : 'Patient profile loaded. Review current vital signs and allergy checklist before prescribing treatment.',
-                          style: GoogleFonts.inter(fontSize: 12, color: AppColors.textSecondary, height: 1.5),
+                          '${tr('doctor_profile_loaded_for')} ${profile.name}${tr('doctor_profile_loaded_tail')}',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                            height: 1.5,
+                          ),
                         ),
                       ],
                     ),
@@ -453,25 +667,47 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'AI Medical History Briefing',
-                      style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                      tr('doctor_ai_medical_history_briefing'),
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
                     ),
                     ElevatedButton.icon(
                       onPressed: workspaceState.isGeneratingBriefing
                           ? null
                           : () {
-                              ref.read(clinicalWorkspaceProvider.notifier).generateBriefing();
+                              ref
+                                  .read(clinicalWorkspaceProvider.notifier)
+                                  .generateBriefing();
                             },
                       icon: workspaceState.isGeneratingBriefing
-                          ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 1.5))
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 1.5,
+                              ),
+                            )
                           : const Icon(Icons.psychology_rounded, size: 16),
-                      label: Text(workspaceState.isGeneratingBriefing ? 'Analyzing...' : 'Generate Briefing'),
+                      label: Text(
+                        workspaceState.isGeneratingBriefing
+                            ? tr('doctor_analyzing')
+                            : tr('doctor_generate_briefing'),
+                      ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.accent,
                         foregroundColor: Colors.white,
                         elevation: 0,
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 8,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                     ),
                   ],
@@ -479,19 +715,29 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
               ] else ...[
                 Row(
                   children: [
-                    const Icon(Icons.fact_check_rounded, color: AppColors.success, size: 16),
+                    const Icon(
+                      Icons.fact_check_rounded,
+                      color: AppColors.success,
+                      size: 16,
+                    ),
                     const SizedBox(width: 8),
                     Text(
-                      'AI Medical Briefing Generated',
-                      style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.success),
+                      tr('doctor_ai_briefing_generated'),
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.success,
+                      ),
                     ),
                     const Spacer(),
                     IconButton(
                       icon: const Icon(Icons.refresh_rounded, size: 16),
                       onPressed: () {
-                        ref.read(clinicalWorkspaceProvider.notifier).generateBriefing();
+                        ref
+                            .read(clinicalWorkspaceProvider.notifier)
+                            .generateBriefing();
                       },
-                      tooltip: 'Regenerate Briefing',
+                      tooltip: tr('doctor_regenerate_briefing'),
                     ),
                   ],
                 ),
@@ -506,18 +752,22 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
                   ),
                   child: Text(
                     workspaceState.aiBriefingText!,
-                    style: GoogleFonts.inter(fontSize: 12, color: AppColors.textPrimary, height: 1.6),
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: AppColors.textPrimary,
+                      height: 1.6,
+                    ),
                   ),
                 ),
               ],
             ],
           ),
         ),
-        
+
         const SizedBox(height: 24),
-        
+
         // Vitals
-        _sectionTitle('Latest Vital Signs'),
+        _sectionTitle(tr('doctor_latest_vital_signs')),
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -533,17 +783,35 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
             mainAxisSpacing: 12,
             childAspectRatio: 1.6,
             children: [
-              _vitalGridItem('Blood Pressure', '${profile.vitals.bpSystolic}/${profile.vitals.bpDiastolic}', 'mmHg', Icons.favorite_rounded, Colors.red),
-              _vitalGridItem('Blood Glucose', profile.vitals.bloodGlucose, 'mg/dL', Icons.bloodtype_rounded, Colors.orange),
-              _vitalGridItem('Heart Rate', profile.vitals.heartRate, 'bpm', Icons.favorite, Colors.pink),
+              _vitalGridItem(
+                tr('doctor_blood_pressure'),
+                '${profile.vitals.bpSystolic}/${profile.vitals.bpDiastolic}',
+                'mmHg',
+                Icons.favorite_rounded,
+                Colors.red,
+              ),
+              _vitalGridItem(
+                tr('doctor_blood_glucose'),
+                profile.vitals.bloodGlucose,
+                'mg/dL',
+                Icons.bloodtype_rounded,
+                Colors.orange,
+              ),
+              _vitalGridItem(
+                tr('doctor_heart_rate'),
+                profile.vitals.heartRate,
+                'bpm',
+                Icons.favorite,
+                Colors.pink,
+              ),
             ],
           ),
         ),
-        
+
         const SizedBox(height: 24),
-        
+
         // Chronic Diseases Details
-        _sectionTitle('Chronic Disease Log'),
+        _sectionTitle(tr('doctor_chronic_disease_log')),
         ListView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -555,58 +823,62 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
               child: ListTile(
                 leading: Container(
                   padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(color: AppColors.warningLight, shape: BoxShape.circle),
-                  child: const Icon(Icons.healing_rounded, color: Colors.orange, size: 18),
+                  decoration: BoxDecoration(
+                    color: AppColors.warningLight,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.healing_rounded,
+                    color: Colors.orange,
+                    size: 18,
+                  ),
                 ),
-                title: Text(cd.diseaseName, style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13)),
-                subtitle: Text('Diagnosed: ${cd.diagnosedDate.year} • Status: ${cd.status}', style: GoogleFonts.inter(fontSize: 11)),
+                title: Text(
+                  cd.diseaseName,
+                  style: GoogleFonts.inter(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
+                subtitle: Text(
+                  '${tr('doctor_diagnosed_prefix')} ${cd.diagnosedDate.year} • ${tr('doctor_status_prefix')} ${cd.status}',
+                  style: GoogleFonts.inter(fontSize: 11),
+                ),
                 dense: true,
               ),
             );
           },
         ),
-        
+
         const SizedBox(height: 24),
-        
+
         // Past Lab Results / Prescriptions
-        _sectionTitle('Historic Records'),
-        DefaultTabController(
-          length: 2,
+        _sectionTitle(tr('doctor_historic_records')),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 16),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.divider.withOpacity(0.5)),
+          ),
           child: Column(
             children: [
-              TabBar(
-                tabs: const [
-                  Tab(text: 'Lab Reports'),
-                  Tab(text: 'Prescriptions'),
-                ],
-                labelStyle: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 12),
-                unselectedLabelStyle: GoogleFonts.inter(fontSize: 12),
-                indicatorColor: AppColors.primary,
-                labelColor: AppColors.primary,
-                unselectedLabelColor: AppColors.textMuted,
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                height: 180,
-                child: TabBarView(
-                  children: [
-                    // Lab reports sublist
-                    ListView(
-                      children: [
-                        _labReportItem('HbA1c & Fasting Glucose', '05 Jun 2026', 'HbA1c 8.2% (High)', AppColors.danger),
-                        _labReportItem('Lipid Profile', '12 May 2026', 'LDL 135 mg/dL (Borderline)', AppColors.warning),
-                        _labReportItem('Serum Creatinine', '08 Apr 2026', '0.9 mg/dL (Normal)', AppColors.success),
-                      ],
-                    ),
-                    // Prescriptions sublist
-                    ListView(
-                      children: [
-                        _prescriptionItem('Dr. Ahmed (Dhaka Central)', '20 May 2026', 'Metformin 500mg, Amlodipine 5mg'),
-                        _prescriptionItem('Dr. Karim (Cardiologist)', '15 Jan 2026', 'Atorvastatin 10mg'),
-                      ],
-                    ),
-                  ],
+              const Icon(Icons.folder_open_rounded, size: 32, color: AppColors.textMuted),
+              const SizedBox(height: 10),
+              Text(
+                tr('doctor_no_historic_records'),
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
                 ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                tr('doctor_records_appear_here'),
+                textAlign: TextAlign.center,
+                style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted),
               ),
             ],
           ),
@@ -615,7 +887,13 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
     );
   }
 
-  Widget _vitalGridItem(String label, String value, String unit, IconData icon, Color color) {
+  Widget _vitalGridItem(
+    String label,
+    String value,
+    String unit,
+    IconData icon,
+    Color color,
+  ) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
@@ -631,7 +909,14 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
             children: [
               Icon(icon, size: 14, color: color),
               const SizedBox(width: 4),
-              Text(label, style: GoogleFonts.inter(fontSize: 10, color: AppColors.textMuted, fontWeight: FontWeight.w500)),
+              Text(
+                label,
+                style: GoogleFonts.inter(
+                  fontSize: 10,
+                  color: AppColors.textMuted,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 4),
@@ -639,9 +924,21 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
             textBaseline: TextBaseline.alphabetic,
             crossAxisAlignment: CrossAxisAlignment.baseline,
             children: [
-              Text(value, style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 15)),
+              Text(
+                value,
+                style: GoogleFonts.outfit(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                ),
+              ),
               const SizedBox(width: 2),
-              Text(unit, style: GoogleFonts.inter(fontSize: 9, color: AppColors.textMuted)),
+              Text(
+                unit,
+                style: GoogleFonts.inter(
+                  fontSize: 9,
+                  color: AppColors.textMuted,
+                ),
+              ),
             ],
           ),
         ],
@@ -653,12 +950,19 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
     return Expanded(
       child: Column(
         children: [
-          Text(label, style: GoogleFonts.inter(color: Colors.white70, fontSize: 11)),
+          Text(
+            label,
+            style: GoogleFonts.inter(color: Colors.white70, fontSize: 11),
+          ),
           const SizedBox(height: 4),
           Text(
             value,
             textAlign: TextAlign.center,
-            style: GoogleFonts.inter(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+            style: GoogleFonts.inter(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -670,66 +974,13 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
   Widget _sectionTitle(String title) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12, top: 4),
-      child: Text(title, style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-    );
-  }
-
-  Widget _labReportItem(String test, String date, String status, Color color) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.divider.withOpacity(0.3)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.science_rounded, size: 16, color: AppColors.textMuted),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(test, style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12)),
-                Text(date, style: GoogleFonts.inter(fontSize: 10, color: AppColors.textMuted)),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(4)),
-            child: Text(status, style: GoogleFonts.inter(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _prescriptionItem(String doctor, String date, String details) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.divider.withOpacity(0.3)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.article_rounded, size: 16, color: AppColors.textMuted),
-              const SizedBox(width: 8),
-              Text(doctor, style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12)),
-              const Spacer(),
-              Text(date, style: GoogleFonts.inter(fontSize: 10, color: AppColors.textMuted)),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(details, style: GoogleFonts.inter(fontSize: 11, color: AppColors.textSecondary)),
-        ],
+      child: Text(
+        title,
+        style: GoogleFonts.outfit(
+          fontSize: 15,
+          fontWeight: FontWeight.bold,
+          color: AppColors.textPrimary,
+        ),
       ),
     );
   }
@@ -742,30 +993,42 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
         const SizedBox(width: 8),
         Text(
           title,
-          style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.primary),
+          style: GoogleFonts.outfit(
+            fontSize: 15,
+            fontWeight: FontWeight.bold,
+            color: AppColors.primary,
+          ),
         ),
       ],
     );
   }
 
   Widget _buildSymptomsSection(ClinicalWorkspaceState state) {
+    final tr = ref.read(translationsProvider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _formHeader('Symptoms / Presenting Complaints', Icons.edit_note_rounded),
+        _formHeader(
+          tr('doctor_symptoms_complaints'),
+          Icons.edit_note_rounded,
+        ),
         const SizedBox(height: 10),
         Row(
           children: [
             Expanded(
-              child: TextField(
+              child: JudgeDummyField(
                 controller: _symptomController,
-                decoration: const InputDecoration(
-                  hintText: 'Type symptom... (e.g. Chest pain, Shortness of breath)',
+                dummyValue:
+                    JudgeDummyData.doctor_clinicalWorkspace_textField_symptoms,
+                decoration: InputDecoration(
+                  hintText: tr('doctor_symptom_hint'),
                   isDense: true,
                 ),
                 onSubmitted: (value) {
                   if (value.trim().isNotEmpty) {
-                    ref.read(clinicalWorkspaceProvider.notifier).addSymptom(value.trim());
+                    ref
+                        .read(clinicalWorkspaceProvider.notifier)
+                        .addSymptom(value.trim());
                     _symptomController.clear();
                   }
                 },
@@ -781,7 +1044,7 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
                 }
               },
               style: ElevatedButton.styleFrom(elevation: 0),
-              child: const Text('Add'),
+              child: Text(tr('doctor_add')),
             ),
           ],
         ),
@@ -794,7 +1057,9 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
               return Chip(
                 label: Text(sym, style: GoogleFonts.inter(fontSize: 12)),
                 backgroundColor: AppColors.background,
-                onDeleted: () => ref.read(clinicalWorkspaceProvider.notifier).removeSymptom(sym),
+                onDeleted: () => ref
+                    .read(clinicalWorkspaceProvider.notifier)
+                    .removeSymptom(sym),
                 deleteIconColor: AppColors.danger,
               );
             }).toList(),
@@ -805,19 +1070,22 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
   }
 
   Widget _buildDiagnosisSection(ClinicalWorkspaceState state) {
+    final tr = ref.read(translationsProvider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _formHeader('Diagnosis', Icons.medical_information_rounded),
+        _formHeader(tr('doctor_diagnosis'), Icons.medical_information_rounded),
         const SizedBox(height: 10),
         Row(
           children: [
             Expanded(
               flex: 3,
-              child: TextField(
+              child: JudgeDummyField(
                 controller: _diseaseController,
-                decoration: const InputDecoration(
-                  hintText: 'Diagnosis (ICD name)...',
+                dummyValue:
+                    JudgeDummyData.doctor_clinicalWorkspace_textField_diagnosis,
+                decoration: InputDecoration(
+                  hintText: tr('doctor_diagnosis_hint'),
                   isDense: true,
                 ),
               ),
@@ -842,7 +1110,10 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
                 },
                 decoration: const InputDecoration(
                   isDense: true,
-                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
                 ),
               ),
             ),
@@ -851,7 +1122,9 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
               onPressed: () {
                 final disease = _diseaseController.text.trim();
                 if (disease.isNotEmpty) {
-                  ref.read(clinicalWorkspaceProvider.notifier).addDiagnosis(
+                  ref
+                      .read(clinicalWorkspaceProvider.notifier)
+                      .addDiagnosis(
                         disease,
                         _diagnosisStatus,
                         _diseaseNotesController.text.trim(),
@@ -861,7 +1134,7 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
                 }
               },
               style: ElevatedButton.styleFrom(elevation: 0),
-              child: const Text('Add'),
+              child: Text(tr('doctor_add')),
             ),
           ],
         ),
@@ -882,11 +1155,26 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
                   side: BorderSide(color: AppColors.divider.withOpacity(0.5)),
                 ),
                 child: ListTile(
-                  title: Text(diag.diseaseName, style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13)),
-                  subtitle: Text('Status: ${diag.status}', style: GoogleFonts.inter(fontSize: 11)),
+                  title: Text(
+                    diag.diseaseName,
+                    style: GoogleFonts.inter(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                  subtitle: Text(
+                    '${tr('doctor_status_prefix')} ${diag.status}',
+                    style: GoogleFonts.inter(fontSize: 11),
+                  ),
                   trailing: IconButton(
-                    icon: const Icon(Icons.delete_outline_rounded, color: AppColors.danger, size: 18),
-                    onPressed: () => ref.read(clinicalWorkspaceProvider.notifier).removeDiagnosis(index),
+                    icon: const Icon(
+                      Icons.delete_outline_rounded,
+                      color: AppColors.danger,
+                      size: 18,
+                    ),
+                    onPressed: () => ref
+                        .read(clinicalWorkspaceProvider.notifier)
+                        .removeDiagnosis(index),
                   ),
                   dense: true,
                 ),
@@ -899,10 +1187,11 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
   }
 
   Widget _buildPrescriptionSection(ClinicalWorkspaceState state) {
+    final tr = ref.read(translationsProvider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _formHeader('Prescribe Medication', Icons.medication_rounded),
+        _formHeader(tr('doctor_prescribe_medication'), Icons.medication_rounded),
         const SizedBox(height: 10),
         Container(
           padding: const EdgeInsets.all(12),
@@ -913,10 +1202,12 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
           ),
           child: Column(
             children: [
-              TextField(
+              JudgeDummyField(
                 controller: _medNameController,
-                decoration: const InputDecoration(
-                  hintText: 'Medicine name (e.g. Glimepiride, Amlodipine)',
+                dummyValue: JudgeDummyData
+                    .doctor_clinicalWorkspace_textField_medicationName,
+                decoration: InputDecoration(
+                  hintText: tr('doctor_medicine_name_hint'),
                   isDense: true,
                 ),
               ),
@@ -924,30 +1215,36 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
               Row(
                 children: [
                   Expanded(
-                    child: TextField(
+                    child: JudgeDummyField(
                       controller: _medDosageController,
-                      decoration: const InputDecoration(
-                        hintText: 'Dosage (e.g. 1+0+1)',
+                      dummyValue: JudgeDummyData
+                          .doctor_clinicalWorkspace_textField_medicationDosage,
+                      decoration: InputDecoration(
+                        hintText: tr('doctor_dosage_hint'),
                         isDense: true,
                       ),
                     ),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: TextField(
+                    child: JudgeDummyField(
                       controller: _medDurationController,
-                      decoration: const InputDecoration(
-                        hintText: 'Duration (e.g. 15 days)',
+                      dummyValue: JudgeDummyData
+                          .doctor_clinicalWorkspace_textField_medicationDuration,
+                      decoration: InputDecoration(
+                        hintText: tr('doctor_duration_hint'),
                         isDense: true,
                       ),
                     ),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: TextField(
+                    child: JudgeDummyField(
                       controller: _medInstructionsController,
-                      decoration: const InputDecoration(
-                        hintText: 'e.g. After food',
+                      dummyValue: JudgeDummyData
+                          .doctor_clinicalWorkspace_textField_medicationInstructions,
+                      decoration: InputDecoration(
+                        hintText: tr('doctor_instructions_hint'),
                         isDense: true,
                       ),
                     ),
@@ -963,9 +1260,11 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
                     final dosage = _medDosageController.text.trim();
                     final duration = _medDurationController.text.trim();
                     final inst = _medInstructionsController.text.trim();
-                    
+
                     if (name.isNotEmpty) {
-                      ref.read(clinicalWorkspaceProvider.notifier).addMedicine(name, dosage, duration, inst);
+                      ref
+                          .read(clinicalWorkspaceProvider.notifier)
+                          .addMedicine(name, dosage, duration, inst);
                       _medNameController.clear();
                       _medDosageController.clear();
                       _medDurationController.clear();
@@ -973,13 +1272,13 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
                     }
                   },
                   icon: const Icon(Icons.add_rounded, size: 18),
-                  label: const Text('Add Medicine'),
+                  label: Text(tr('doctor_add_medicine')),
                 ),
               ),
             ],
           ),
         ),
-        
+
         if (state.medicines.isNotEmpty) ...[
           const SizedBox(height: 12),
           ListView.builder(
@@ -997,14 +1296,30 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
                   side: BorderSide(color: AppColors.divider.withOpacity(0.5)),
                 ),
                 child: ListTile(
-                  title: Text(med.medicineName, style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primary)),
+                  title: Text(
+                    med.medicineName,
+                    style: GoogleFonts.inter(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      color: AppColors.primary,
+                    ),
+                  ),
                   subtitle: Text(
-                    'Dosage: ${med.dosage} • Duration: ${med.duration} • ${med.instructions}',
-                    style: GoogleFonts.inter(fontSize: 11, color: AppColors.textSecondary),
+                    '${tr('doctor_dosage_prefix')} ${med.dosage} • ${tr('doctor_duration_prefix')} ${med.duration} • ${med.instructions}',
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                   trailing: IconButton(
-                    icon: const Icon(Icons.delete_outline_rounded, color: AppColors.danger, size: 18),
-                    onPressed: () => ref.read(clinicalWorkspaceProvider.notifier).removeMedicine(index),
+                    icon: const Icon(
+                      Icons.delete_outline_rounded,
+                      color: AppColors.danger,
+                      size: 18,
+                    ),
+                    onPressed: () => ref
+                        .read(clinicalWorkspaceProvider.notifier)
+                        .removeMedicine(index),
                   ),
                   dense: true,
                 ),
@@ -1026,10 +1341,11 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
       'Chest X-Ray',
     ];
 
+    final tr = ref.read(translationsProvider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _formHeader('Investigations / Diagnostics', Icons.science_rounded),
+        _formHeader(tr('doctor_investigations_diagnostics'), Icons.science_rounded),
         const SizedBox(height: 12),
         Wrap(
           spacing: 8,
@@ -1037,22 +1353,33 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
           children: availableTests.map((test) {
             final checked = state.investigations.contains(test);
             return InkWell(
-              onTap: () => ref.read(clinicalWorkspaceProvider.notifier).toggleInvestigation(test),
+              onTap: () => ref
+                  .read(clinicalWorkspaceProvider.notifier)
+                  .toggleInvestigation(test),
               borderRadius: BorderRadius.circular(8),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
-                  color: checked ? AppColors.primaryLight : AppColors.background,
+                  color: checked
+                      ? AppColors.primaryLight
+                      : AppColors.background,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: checked ? AppColors.primary.withOpacity(0.3) : AppColors.divider.withOpacity(0.5),
+                    color: checked
+                        ? AppColors.primary.withOpacity(0.3)
+                        : AppColors.divider.withOpacity(0.5),
                   ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                      checked ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
+                      checked
+                          ? Icons.check_box_rounded
+                          : Icons.check_box_outline_blank_rounded,
                       size: 18,
                       color: checked ? AppColors.primary : AppColors.textMuted,
                     ),
@@ -1061,7 +1388,9 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
                       test,
                       style: GoogleFonts.inter(
                         fontSize: 12,
-                        color: checked ? AppColors.primary : AppColors.textSecondary,
+                        color: checked
+                            ? AppColors.primary
+                            : AppColors.textSecondary,
                         fontWeight: checked ? FontWeight.w600 : FontWeight.w400,
                       ),
                     ),
@@ -1076,16 +1405,19 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
   }
 
   Widget _buildNotesSection() {
+    final tr = ref.read(translationsProvider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _formHeader('Clinical Notes / Observations', Icons.note_alt_rounded),
+        _formHeader(tr('doctor_clinical_notes'), Icons.note_alt_rounded),
         const SizedBox(height: 10),
-        TextField(
+        JudgeDummyField(
           controller: _notesController,
+          dummyValue:
+              JudgeDummyData.doctor_clinicalWorkspace_textField_clinicalNotes,
           maxLines: 3,
-          decoration: const InputDecoration(
-            hintText: 'Enter clinical history findings, observations, or advice...',
+          decoration: InputDecoration(
+            hintText: tr('doctor_clinical_notes_hint'),
           ),
         ),
       ],
@@ -1093,19 +1425,22 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
   }
 
   Widget _buildFollowUpReferralSection() {
+    final tr = ref.read(translationsProvider);
     return Row(
       children: [
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _formHeader('Follow-up', Icons.event_rounded),
+              _formHeader(tr('doctor_followup'), Icons.event_rounded),
               const SizedBox(height: 10),
-              TextField(
+              JudgeDummyField(
                 controller: _followUpController,
-                decoration: const InputDecoration(
-                  hintText: 'In 2 weeks, In 1 month, etc.',
-                  prefixIcon: Icon(Icons.calendar_today_rounded, size: 18),
+                dummyValue:
+                    JudgeDummyData.doctor_clinicalWorkspace_textField_followUp,
+                decoration: InputDecoration(
+                  hintText: tr('doctor_followup_hint'),
+                  prefixIcon: const Icon(Icons.calendar_today_rounded, size: 18),
                   isDense: true,
                 ),
               ),
@@ -1117,13 +1452,15 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _formHeader('Referral (Optional)', Icons.send_rounded),
+              _formHeader(tr('doctor_referral_optional'), Icons.send_rounded),
               const SizedBox(height: 10),
-              TextField(
+              JudgeDummyField(
                 controller: _referralController,
-                decoration: const InputDecoration(
-                  hintText: 'Specialist name / Department',
-                  prefixIcon: Icon(Icons.person_search_rounded, size: 18),
+                dummyValue:
+                    JudgeDummyData.doctor_clinicalWorkspace_textField_referral,
+                decoration: InputDecoration(
+                  hintText: tr('doctor_referral_hint'),
+                  prefixIcon: const Icon(Icons.person_search_rounded, size: 18),
                   isDense: true,
                 ),
               ),
@@ -1134,27 +1471,39 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
     );
   }
 
-  Widget _buildAiAlertsPanel(ClinicalWorkspaceState state, PatientProfile? profile) {
+  Widget _buildAiAlertsPanel(
+    ClinicalWorkspaceState state,
+    PatientProfile? profile,
+  ) {
+    final tr = ref.read(translationsProvider);
     final List<Widget> alerts = [];
 
     // 1. Allergy Alert logic
-    final bool hasPenicillinAllergy = profile?.allergies.any((a) => a.allergen.toLowerCase().contains('penicillin')) ?? false;
+    final bool hasPenicillinAllergy =
+        profile?.allergies.any(
+          (a) => a.allergen.toLowerCase().contains('penicillin'),
+        ) ??
+        false;
     final bool hasPrescribedPenicillin = state.medicines.any((m) {
       final name = m.medicineName.toLowerCase();
-      return name.contains('penicillin') || name.contains('amoxicillin') || name.contains('ampicillin') || name.contains('cloxacillin') || name.contains('augmentin');
+      return name.contains('penicillin') ||
+          name.contains('amoxicillin') ||
+          name.contains('ampicillin') ||
+          name.contains('cloxacillin') ||
+          name.contains('augmentin');
     });
 
     if (hasPenicillinAllergy && hasPrescribedPenicillin) {
       alerts.add(
-        const Padding(
-          padding: EdgeInsets.only(bottom: 12),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
           child: AiInsightPanel(
-            title: 'Critical Allergy Warning (Penicillin Derivatives)',
-            description: 'Patient has a recorded Penicillin allergy with severity: Severe (Anaphylaxis). Prescribed medicine is a penicillin derivative. Risk of severe allergic reaction!',
+            title: tr('doctor_allergy_warning_title'),
+            description: tr('doctor_allergy_warning_desc'),
             type: 'danger',
             recommendations: [
-              'Replace Amoxicillin/Penicillin with a Macrolide (e.g. Azithromycin) or Fluoroquinolone.',
-              'Verify patient allergy history card prior to treatment plan submission.',
+              tr('doctor_allergy_warning_rec1'),
+              tr('doctor_allergy_warning_rec2'),
             ],
           ),
         ),
@@ -1162,19 +1511,23 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
     }
 
     // 2. Drug Interaction logic (e.g. Aspirin and Glimepiride)
-    final hasAspirin = state.medicines.any((m) => m.medicineName.toLowerCase().contains('aspirin'));
-    final hasGlimepiride = state.medicines.any((m) => m.medicineName.toLowerCase().contains('glimepiride'));
+    final hasAspirin = state.medicines.any(
+      (m) => m.medicineName.toLowerCase().contains('aspirin'),
+    );
+    final hasGlimepiride = state.medicines.any(
+      (m) => m.medicineName.toLowerCase().contains('glimepiride'),
+    );
     if (hasAspirin && hasGlimepiride) {
       alerts.add(
-        const Padding(
-          padding: EdgeInsets.only(bottom: 12),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
           child: AiInsightPanel(
-            title: 'Drug-Drug Interaction Alert (Aspirin & Glimepiride)',
-            description: 'Aspirin may enhance the hypoglycemic effect of Glimepiride, increasing the risk of hypoglycemia. Monitor blood glucose levels closely.',
+            title: tr('doctor_drug_interaction_title'),
+            description: tr('doctor_drug_interaction_desc'),
             type: 'warning',
             recommendations: [
-              'Adjust Glimepiride dosage if co-administered with daily Aspirin.',
-              'Advise the patient to monitor for symptoms of hypoglycemia (dizziness, sweating, shakiness).',
+              tr('doctor_drug_interaction_rec1'),
+              tr('doctor_drug_interaction_rec2'),
             ],
           ),
         ),
@@ -1182,19 +1535,24 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
     }
 
     // 3. Clinical Recommendation logic (suggest ECG for cardiac patients if not ordered)
-    final hasCardiacComplaint = state.symptoms.any((s) => s.toLowerCase().contains('chest pain') || s.toLowerCase().contains('breathless') || s.toLowerCase().contains('palpitations'));
+    final hasCardiacComplaint = state.symptoms.any(
+      (s) =>
+          s.toLowerCase().contains('chest pain') ||
+          s.toLowerCase().contains('breathless') ||
+          s.toLowerCase().contains('palpitations'),
+    );
     final hasOrderedEcg = state.investigations.contains('ECG');
     if (hasCardiacComplaint && !hasOrderedEcg) {
       alerts.add(
-        const Padding(
-          padding: EdgeInsets.only(bottom: 12),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
           child: AiInsightPanel(
-            title: 'Clinical Diagnostics Support Recommendation',
-            description: 'Patient presents with cardiac symptoms (e.g. chest pain). A 12-lead ECG is recommended to rule out myocardial ischemia.',
+            title: tr('doctor_diagnostics_support_title'),
+            description: tr('doctor_diagnostics_support_desc'),
             type: 'info',
             recommendations: [
-              'Order a 12-lead resting ECG card from the Investigations menu.',
-              'Monitor baseline cardiovascular telemetry logs.',
+              tr('doctor_diagnostics_support_rec1'),
+              tr('doctor_diagnostics_support_rec2'),
             ],
           ),
         ),
@@ -1211,19 +1569,25 @@ class _ClinicalWorkspacePageState extends ConsumerState<ClinicalWorkspacePage> {
         ),
         child: Row(
           children: [
-            const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 18),
+            const Icon(
+              Icons.check_circle_rounded,
+              color: AppColors.success,
+              size: 18,
+            ),
             const SizedBox(width: 10),
             Text(
-              'AI Safety Check: No issues or warnings found.',
-              style: GoogleFonts.inter(fontSize: 12, color: AppColors.success, fontWeight: FontWeight.w600),
+              tr('doctor_ai_safety_check_ok'),
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                color: AppColors.success,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
         ),
       );
     }
 
-    return Column(
-      children: alerts,
-    );
+    return Column(children: alerts);
   }
 }

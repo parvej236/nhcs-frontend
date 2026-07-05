@@ -1,187 +1,61 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+
+import '../../../core/l10n/app_translations.dart';
+import '../../../core/providers/language_provider.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/pdf_view_dialog.dart';
+import '../../patient/data/models/medical_record.dart';
 import '../data/models/lab_test_order.dart';
 import '../presentation/providers/hospital_providers.dart';
 
-class LaboratoryPage extends ConsumerStatefulWidget {
+/// ─────────────────────────────────────────────────────────────────────────
+///  LABORATORY · Requested Lab Reports
+/// ─────────────────────────────────────────────────────────────────────────
+///
+///  A single, clean page. It lists the lab reports requested by doctors
+///  (the pending orders in [labOrdersProvider]). Tapping a request expands it
+///  in place:
+///
+///    1. A line progress indicator runs for ~3s under "Scanning the Lab
+///       report..." → "Scanning completed".
+///    2. The generated report is shown using the existing [LabReportPdfView].
+///    3. "Submit Report" publishes it — it flows simultaneously into the
+///       requesting doctor's Report Review queue and the patient's Medical
+///       Vault.
+class LaboratoryPage extends ConsumerWidget {
   const LaboratoryPage({super.key});
 
   @override
-  ConsumerState<LaboratoryPage> createState() => _LaboratoryPageState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tr = ref.watch(translationsProvider);
+    // Real pending lab requests raised by doctors (backend: /hospitals/lab-orders).
+    final requests = ref
+        .watch(laboratoryQueueProvider)
+        .where((o) => o.status != 'Published')
+        .toList();
 
-class _LaboratoryPageState extends ConsumerState<LaboratoryPage> {
-
-  void _nextStage(LabTestOrder order) {
-    if (order.status == 'Processing') {
-      _showResultEntryDialog(order);
-    } else {
-      ref.read(laboratoryQueueProvider.notifier).advanceStage(order.id);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Order ${order.id} advanced.')),
-      );
-    }
-  }
-
-  void _submitResults(String orderId, Map<String, String> results) {
-    ref.read(laboratoryQueueProvider.notifier).advanceStage(orderId, results: results);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Results submitted for $orderId. Awaiting senior verification.'),
-        backgroundColor: AppColors.success,
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildHeader(),
-          _buildWorkloadStats(),
+          _buildHeader(context, ref, tr, requests.length),
           Expanded(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildKanbanColumn('Ordered', Icons.assignment_rounded, AppColors.info),
-                  _buildKanbanColumn('Sample Collected', Icons.biotech_rounded, AppColors.accent),
-                  _buildKanbanColumn('Processing', Icons.sync_rounded, AppColors.warning),
-                  _buildKanbanColumn('Verified', Icons.verified_rounded, AppColors.success),
-                  _buildKanbanColumn('Published', Icons.check_circle_rounded, AppColors.primary),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHeader() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
-      color: AppColors.surface,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Laboratory Operations',
-            style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Track and enter diagnostic results from collection to digital publication.',
-            style: GoogleFonts.inter(color: AppColors.textSecondary, fontSize: 13),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildWorkloadStats() {
-    final labOrders = ref.watch(laboratoryQueueProvider);
-    final ordered = labOrders.where((o) => o.status == 'Ordered').length;
-    final processing = labOrders.where((o) => o.status == 'Processing' || o.status == 'Sample Collected').length;
-    final verified = labOrders.where((o) => o.status == 'Verified').length;
-    final completed = labOrders.where((o) => o.status == 'Published').length;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        border: Border(bottom: BorderSide(color: AppColors.divider.withOpacity(0.5))),
-      ),
-      child: Row(
-        children: [
-          _statMini('Pending Orders', ordered.toString(), AppColors.info),
-          _statDivider(),
-          _statMini('In Lab Processing', processing.toString(), AppColors.warning),
-          _statDivider(),
-          _statMini('Awaiting Verification', verified.toString(), AppColors.accent),
-          _statDivider(),
-          _statMini('Published Today', completed.toString(), AppColors.success),
-        ],
-      ),
-    );
-  }
-
-  Widget _statMini(String label, String value, Color color) {
-    return Row(
-      children: [
-        Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 8),
-        Text('$label: ', style: GoogleFonts.inter(color: AppColors.textSecondary, fontSize: 13)),
-        Text(value, style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary)),
-      ],
-    );
-  }
-
-  Widget _statDivider() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Container(width: 1, height: 16, color: AppColors.divider),
-    );
-  }
-
-  Widget _buildKanbanColumn(String status, IconData icon, Color color) {
-    final labOrders = ref.watch(laboratoryQueueProvider);
-    final list = labOrders.where((o) => o.status == status).toList();
-
-    return Container(
-      width: 280,
-      margin: const EdgeInsets.only(right: 16),
-      decoration: BoxDecoration(
-        color: AppColors.surface.withOpacity(0.8),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.divider),
-      ),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.05),
-              borderRadius: const BorderRadius.only(topLeft: Radius.circular(16), topRight: Radius.circular(16)),
-              border: Border(bottom: BorderSide(color: AppColors.divider.withOpacity(0.5))),
-            ),
-            child: Row(
-              children: [
-                Icon(icon, color: color, size: 18),
-                const SizedBox(width: 8),
-                Text(status, style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textPrimary)),
-                const Spacer(),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(color: color.withOpacity(0.15), borderRadius: BorderRadius.circular(8)),
-                  child: Text(list.length.toString(), style: GoogleFonts.inter(color: color, fontSize: 11, fontWeight: FontWeight.bold)),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: list.isEmpty
-                ? Center(
-                    child: Text('No orders in this column', style: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 12)),
-                  )
+            child: requests.isEmpty
+                ? _buildEmptyState(tr)
                 : ListView.separated(
-                    padding: const EdgeInsets.all(12),
-                    itemCount: list.length,
-                    separatorBuilder: (context, index) => const SizedBox(height: 12),
+                    padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+                    itemCount: requests.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 14),
                     itemBuilder: (context, index) {
-                      final order = list[index];
-                      return _buildKanbanCard(order, color);
+                      final order = requests[index];
+                      return _RequestedReportCard(
+                        key: ValueKey(order.id),
+                        order: order,
+                        onSubmit: (results) => _submit(context, ref, tr, order, results),
+                      );
                     },
                   ),
           ),
@@ -190,155 +64,491 @@ class _LaboratoryPageState extends ConsumerState<LaboratoryPage> {
     );
   }
 
-  Widget _buildKanbanCard(LabTestOrder order, Color themeColor) {
-    final String status = order.status;
+  Future<void> _submit(
+    BuildContext context,
+    WidgetRef ref,
+    AppTranslations tr,
+    LabTestOrder order,
+    List<LabTestResult> results,
+  ) async {
+    // Structured result rows the backend persists against the lab report.
+    final payload = results
+        .map((r) => {
+              'parameter': r.parameter,
+              'value': r.value,
+              'unit': r.unit,
+              'referenceRange': r.referenceRange,
+              'status': r.status,
+            })
+        .toList();
 
+    try {
+      // Publishes to the backend → status 'Published' + results attached, so it
+      // surfaces in the patient's Medical Vault (/patients/me/lab-reports) and,
+      // because the report carries the requesting doctor's name, in that
+      // doctor's Report Review queue (/doctors/reports/pending).
+      await ref.read(laboratoryQueueProvider.notifier).publishOrder(order.id, payload);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${tr('hospital_lab_report_word')} ${order.id} ${tr('hospital_lab_snackbar_published_mid')} ${order.patient}${tr('hospital_lab_snackbar_vault_and')} ${order.doctor}${tr('hospital_lab_snackbar_queue_end')}',
+          ),
+          backgroundColor: AppColors.success,
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${tr('hospital_lab_publish_failed')}: $e'),
+          backgroundColor: AppColors.danger,
+        ),
+      );
+    }
+  }
+
+  Widget _buildHeader(BuildContext context, WidgetRef ref, AppTranslations tr, int count) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.divider),
+        border: Border(bottom: BorderSide(color: AppColors.divider.withOpacity(0.5))),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
+              const Icon(Icons.science_rounded, color: AppColors.primary, size: 24),
+              const SizedBox(width: 10),
               Text(
-                order.id,
-                style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 11, color: AppColors.textMuted),
+                tr('hospital_lab_requested_lab_reports'),
+                style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold),
               ),
-              if (order.results.isNotEmpty)
-                const Icon(Icons.description_rounded, size: 14, color: AppColors.textSecondary),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            order.test,
-            style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textPrimary),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Patient: ${order.patient}',
-            style: GoogleFonts.inter(fontSize: 12, color: AppColors.textSecondary),
-          ),
-          Text(
-            'Dr: ${order.doctor}',
-            style: GoogleFonts.inter(fontSize: 11, color: AppColors.textMuted),
-          ),
-          const SizedBox(height: 12),
-          const Divider(height: 1),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Actions',
-                style: GoogleFonts.inter(fontSize: 11, color: AppColors.textMuted),
-              ),
-              if (status != 'Published')
-                InkWell(
-                  onTap: () => _nextStage(order),
-                  borderRadius: BorderRadius.circular(6),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: themeColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Row(
-                      children: [
-                        Text(
-                          status == 'Processing' ? 'Enter' : 'Advance',
-                          style: GoogleFonts.inter(color: themeColor, fontSize: 11, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(width: 4),
-                        Icon(Icons.arrow_forward_rounded, size: 10, color: themeColor),
-                      ],
-                    ),
+              const SizedBox(width: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  '$count ${tr('hospital_lab_pending')}',
+                  style: GoogleFonts.inter(
+                    color: AppColors.primary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
                   ),
-                )
-              else
-                const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 16),
+                ),
+              ),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.refresh_rounded, color: AppColors.primary),
+                tooltip: tr('hospital_lab_reload_requests'),
+                onPressed: () => ref.read(laboratoryQueueProvider.notifier).loadOrders(),
+              ),
             ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            tr('hospital_lab_header_subtitle'),
+            style: GoogleFonts.inter(color: AppColors.textSecondary, fontSize: 13),
           ),
         ],
       ),
     );
   }
 
-  void _showResultEntryDialog(LabTestOrder order) {
-    final keyCont = TextEditingController(text: 'Hemoglobin');
-    final valCont = TextEditingController(text: '14.2 g/dL');
+  Widget _buildEmptyState(AppTranslations tr) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.inbox_rounded, size: 56, color: AppColors.textMuted.withOpacity(0.5)),
+          const SizedBox(height: 12),
+          Text(
+            tr('hospital_lab_no_pending_requests'),
+            style: GoogleFonts.outfit(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            tr('hospital_lab_empty_hint'),
+            style: GoogleFonts.inter(fontSize: 13, color: AppColors.textMuted),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text('Enter Lab Results (${order.id})', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Test: ${order.test}', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 14)),
-              Text('Patient: ${order.patient}', style: GoogleFonts.inter(fontSize: 12, color: AppColors.textSecondary)),
-              const SizedBox(height: 16),
-              const Divider(),
-              const SizedBox(height: 16),
-              TextField(
-                controller: keyCont,
-                decoration: const InputDecoration(labelText: 'Parameter / Biomarker'),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: valCont,
-                decoration: const InputDecoration(labelText: 'Measured Value'),
-              ),
-              const SizedBox(height: 20),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryLight,
-                  borderRadius: BorderRadius.circular(10),
+/// The three visual phases of an expanded request card.
+enum _CardPhase { collapsed, scanning, ready }
+
+class _RequestedReportCard extends ConsumerStatefulWidget {
+  const _RequestedReportCard({
+    super.key,
+    required this.order,
+    required this.onSubmit,
+  });
+
+  final LabTestOrder order;
+  final ValueChanged<List<LabTestResult>> onSubmit;
+
+  @override
+  ConsumerState<_RequestedReportCard> createState() => _RequestedReportCardState();
+}
+
+class _RequestedReportCardState extends ConsumerState<_RequestedReportCard>
+    with SingleTickerProviderStateMixin {
+  _CardPhase _phase = _CardPhase.collapsed;
+  bool _submitted = false;
+  late final AnimationController _scanController;
+  late final List<LabTestResult> _results;
+
+  @override
+  void initState() {
+    super.initState();
+    _results = _generateResults(widget.order);
+    _scanController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 3),
+    )..addStatusListener((status) {
+        if (status == AnimationStatus.completed && mounted) {
+          setState(() => _phase = _CardPhase.ready);
+        }
+      });
+  }
+
+  @override
+  void dispose() {
+    _scanController.dispose();
+    super.dispose();
+  }
+
+  void _toggle() {
+    if (_phase == _CardPhase.collapsed) {
+      setState(() => _phase = _CardPhase.scanning);
+      _scanController.forward(from: 0);
+    } else {
+      // Collapse and reset.
+      _scanController.stop();
+      setState(() => _phase = _CardPhase.collapsed);
+    }
+  }
+
+  LabReport get _report => LabReport(
+        id: widget.order.id,
+        testName: widget.order.test,
+        category: 'Diagnostics',
+        date: DateTime.now(),
+        hospitalName: 'Dhaka Central Hospital',
+        doctorName: widget.order.doctor,
+        status: 'Published',
+        results: _results,
+        aiInterpretation: ref.read(translationsProvider)('hospital_lab_ai_interpretation'),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final expanded = _phase != _CardPhase.collapsed;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: expanded ? AppColors.primary.withOpacity(0.5) : AppColors.divider,
+        ),
+        boxShadow: expanded
+            ? [
+                BoxShadow(
+                  color: AppColors.primary.withOpacity(0.08),
+                  blurRadius: 18,
+                  offset: const Offset(0, 6),
                 ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.cloud_upload_outlined, color: AppColors.primary),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Simulate PDF Upload', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12)),
-                          Text('Report is uploaded to MinIO storage', style: GoogleFonts.inter(fontSize: 10, color: AppColors.textSecondary)),
-                        ],
-                      ),
+              ]
+            : null,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildCardHeader(expanded),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeInOut,
+            alignment: Alignment.topCenter,
+            child: expanded
+                ? Padding(
+                    padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+                    child: _phase == _CardPhase.scanning
+                        ? _buildScanning()
+                        : _buildReport(),
+                  )
+                : const SizedBox(width: double.infinity),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCardHeader(bool expanded) {
+    final tr = ref.watch(translationsProvider);
+    final o = widget.order;
+    return InkWell(
+      onTap: _submitted ? null : _toggle,
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                _submitted ? Icons.check_circle_rounded : Icons.biotech_rounded,
+                color: _submitted ? AppColors.success : AppColors.primary,
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    o.test,
+                    style: GoogleFonts.inter(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                      color: AppColors.textPrimary,
                     ),
-                    const Icon(Icons.check_circle, color: AppColors.success, size: 18),
-                  ],
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    '${o.patient}  ·  ${o.healthId}',
+                    style: GoogleFonts.inter(fontSize: 12, color: AppColors.textSecondary),
+                  ),
+                  Text(
+                    '${tr('hospital_lab_requested_by')} ${o.doctor}',
+                    style: GoogleFonts.inter(fontSize: 11, color: AppColors.textMuted),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            if (_submitted)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: AppColors.success.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(8),
                 ),
+                child: Text(
+                  tr('hospital_lab_submitted'),
+                  style: GoogleFonts.inter(
+                    color: AppColors.success,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              )
+            else
+              Row(
+                children: [
+                  Text(
+                    o.id,
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      color: AppColors.textMuted,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(
+                    expanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                    color: AppColors.textSecondary,
+                  ),
+                ],
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildScanning() {
+    final tr = ref.watch(translationsProvider);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Divider(height: 1),
+        const SizedBox(height: 20),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: AnimatedBuilder(
+            animation: _scanController,
+            builder: (context, _) => LinearProgressIndicator(
+              value: _scanController.value,
+              minHeight: 6,
+              backgroundColor: AppColors.primary.withOpacity(0.12),
+              valueColor: const AlwaysStoppedAnimation(AppColors.primary),
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        Row(
+          children: [
+            const SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              tr('hospital_lab_scanning'),
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+
+  Widget _buildReport() {
+    final tr = ref.watch(translationsProvider);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Divider(height: 1),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 18),
+            const SizedBox(width: 8),
+            Text(
+              tr('hospital_lab_scanning_completed'),
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: AppColors.success,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        // The reused lab-report layout, rendered on a white "page" like the
+        // existing PDF viewer canvas.
+        Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.12),
+                blurRadius: 14,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
+          padding: const EdgeInsets.all(28),
+          child: LabReportPdfView(report: _report),
+        ),
+        const SizedBox(height: 18),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: _submitted ? null : _onSubmit,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            ElevatedButton(
-              onPressed: () {
-                if (keyCont.text.isNotEmpty && valCont.text.isNotEmpty) {
-                  _submitResults(order.id, {keyCont.text: valCont.text});
-                  Navigator.pop(context);
-                }
-              },
-              child: const Text('Submit & Send to Verification'),
+            icon: const Icon(Icons.send_rounded, size: 18),
+            label: Text(
+              tr('hospital_lab_submit_report'),
+              style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 14),
             ),
-          ],
-        );
-      },
+          ),
+        ),
+      ],
     );
   }
+
+  void _onSubmit() {
+    widget.onSubmit(_results);
+    setState(() {
+      _submitted = true;
+      _phase = _CardPhase.collapsed;
+    });
+  }
+}
+
+/// Produces plausible result rows for the scanned report based on the test
+/// name, so the reused [LabReportPdfView] renders a realistic report.
+List<LabTestResult> _generateResults(LabTestOrder order) {
+  if (order.results.isNotEmpty) {
+    return order.results.entries
+        .map((e) => LabTestResult(
+              parameter: e.key,
+              value: e.value,
+              unit: '',
+              referenceRange: '',
+              status: 'Normal',
+            ))
+        .toList();
+  }
+
+  final t = order.test.toLowerCase();
+  if (t.contains('cbc') || t.contains('blood count')) {
+    return [
+      LabTestResult(parameter: 'Haemoglobin', value: '13.8', unit: 'g/dL', referenceRange: '13.0 – 17.0', status: 'Normal'),
+      LabTestResult(parameter: 'WBC Count', value: '7.2', unit: '10³/µL', referenceRange: '4.0 – 11.0', status: 'Normal'),
+      LabTestResult(parameter: 'Platelets', value: '250', unit: '10³/µL', referenceRange: '150 – 400', status: 'Normal'),
+    ];
+  }
+  if (t.contains('glucose')) {
+    return [
+      LabTestResult(parameter: 'Glucose (Fasting)', value: '6.4', unit: 'mmol/L', referenceRange: '< 5.6', status: 'High'),
+    ];
+  }
+  if (t.contains('lipid')) {
+    return [
+      LabTestResult(parameter: 'Total Cholesterol', value: '210', unit: 'mg/dL', referenceRange: '< 200', status: 'High'),
+      LabTestResult(parameter: 'HDL', value: '48', unit: 'mg/dL', referenceRange: '> 40', status: 'Normal'),
+      LabTestResult(parameter: 'LDL', value: '132', unit: 'mg/dL', referenceRange: '< 130', status: 'High'),
+      LabTestResult(parameter: 'Triglycerides', value: '150', unit: 'mg/dL', referenceRange: '< 150', status: 'Normal'),
+    ];
+  }
+  if (t.contains('creatinine')) {
+    return [
+      LabTestResult(parameter: 'Serum Creatinine', value: '1.0', unit: 'mg/dL', referenceRange: '0.7 – 1.3', status: 'Normal'),
+    ];
+  }
+  if (t.contains('ecg') || t.contains('electrocardiogram')) {
+    return [
+      LabTestResult(parameter: 'Rhythm', value: 'Normal Sinus Rhythm', unit: '', referenceRange: 'Regular', status: 'Normal'),
+      LabTestResult(parameter: 'Heart Rate', value: '76', unit: 'bpm', referenceRange: '60 – 100', status: 'Normal'),
+    ];
+  }
+  // Generic fallback.
+  return [
+    LabTestResult(parameter: order.test, value: 'Within range', unit: '', referenceRange: 'Normal', status: 'Normal'),
+  ];
 }

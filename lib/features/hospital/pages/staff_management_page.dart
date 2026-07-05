@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/providers/language_provider.dart';
 import '../data/models/staff_member.dart';
 import '../presentation/providers/hospital_providers.dart';
 
@@ -31,6 +32,7 @@ class _StaffManagementPageState extends ConsumerState<StaffManagementPage> with 
   }
 
   void _addStaffMember(String name, String role, String dept, String shift) {
+    final tr = ref.read(translationsProvider);
     final staffList = ref.read(staffRosterProvider);
     final id = 'S-${(staffList.length + 1).toString().padLeft(3, '0')}';
     final newStaff = StaffMember(
@@ -45,45 +47,48 @@ class _StaffManagementPageState extends ConsumerState<StaffManagementPage> with 
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Added $name to Hospital Directory.'),
+        content: Text('${tr('hospital_staff_added_prefix')} $name ${tr('hospital_staff_added_suffix')}'),
         backgroundColor: AppColors.success,
       ),
     );
   }
 
   void _approveDoctor(String id, String name) {
+    final tr = ref.read(translationsProvider);
     ref.read(doctorVerificationsProvider.notifier).verifyDoctor(id, true);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Approved $name! Added to Hospital Staff Directory.'),
+        content: Text('${tr('hospital_staff_approved_prefix')} $name! ${tr('hospital_staff_approved_suffix')}'),
         backgroundColor: AppColors.success,
       ),
     );
   }
 
   void _rejectDoctor(String id) {
+    final tr = ref.read(translationsProvider);
     ref.read(doctorVerificationsProvider.notifier).verifyDoctor(id, false);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Application rejected.'), backgroundColor: AppColors.danger),
+      SnackBar(content: Text(tr('hospital_staff_application_rejected')), backgroundColor: AppColors.danger),
     );
   }
 
   void _editShiftDialog(StaffMember staff, String day) {
+    final tr = ref.read(translationsProvider);
     final shiftCont = TextEditingController(text: staff.shifts[day] ?? 'Off');
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text('Edit Duty Shift for ${staff.name}', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+          title: Text('${tr('hospital_staff_edit_duty_shift_for')} ${staff.name}', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Day: $day', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
+              Text('${tr('hospital_staff_day')}: $day', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
                 value: ['Off', 'OPD', 'Ward', 'Emergency', 'Night'].contains(shiftCont.text) ? shiftCont.text : 'OPD',
-                decoration: const InputDecoration(labelText: 'Shift Designation'),
+                decoration: InputDecoration(labelText: tr('hospital_staff_shift_designation')),
                 onChanged: (val) {
                   if (val != null) {
                     shiftCont.text = val;
@@ -96,16 +101,16 @@ class _StaffManagementPageState extends ConsumerState<StaffManagementPage> with 
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            TextButton(onPressed: () => Navigator.pop(context), child: Text(tr('hospital_staff_cancel'))),
             ElevatedButton(
               onPressed: () {
                 ref.read(staffRosterProvider.notifier).updateShift(staff.id, day, shiftCont.text);
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Updated shift for ${staff.name} on $day to ${shiftCont.text}')),
+                  SnackBar(content: Text('${tr('hospital_staff_updated_shift_for')} ${staff.name} ${tr('hospital_staff_on')} $day ${tr('hospital_staff_to')} ${shiftCont.text}')),
                 );
               },
-              child: const Text('Save Shift'),
+              child: Text(tr('hospital_staff_save_shift')),
             ),
           ],
         );
@@ -138,6 +143,7 @@ class _StaffManagementPageState extends ConsumerState<StaffManagementPage> with 
   }
 
   Widget _buildHeader() {
+    final tr = ref.watch(translationsProvider);
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
       color: AppColors.surface,
@@ -148,20 +154,36 @@ class _StaffManagementPageState extends ConsumerState<StaffManagementPage> with 
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Staff & Workforce Management',
+                tr('hospital_staff_title'),
                 style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 4),
               Text(
-                'Manage clinical rosters, staff directory list, and verify doctor affiliations.',
+                tr('hospital_staff_subtitle'),
                 style: GoogleFonts.inter(color: AppColors.textSecondary, fontSize: 13),
               ),
             ],
           ),
-          ElevatedButton.icon(
-            onPressed: () => _showAddStaffDialog(),
-            icon: const Icon(Icons.person_add_rounded),
-            label: const Text('Add Staff Member'),
+          Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.refresh_rounded, color: AppColors.primary),
+                tooltip: tr('hospital_staff_reload'),
+                onPressed: () {
+                  ref.invalidate(staffRosterProvider);
+                  ref.invalidate(doctorVerificationsProvider);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(tr('hospital_staff_reloaded')), duration: const Duration(seconds: 1)),
+                  );
+                },
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton.icon(
+                onPressed: () => _showAddStaffDialog(),
+                icon: const Icon(Icons.person_add_rounded),
+                label: Text(tr('hospital_staff_add_member')),
+              ),
+            ],
           ),
         ],
       ),
@@ -169,6 +191,7 @@ class _StaffManagementPageState extends ConsumerState<StaffManagementPage> with 
   }
 
   Widget _buildTabBar() {
+    final tr = ref.watch(translationsProvider);
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -177,10 +200,10 @@ class _StaffManagementPageState extends ConsumerState<StaffManagementPage> with 
       ),
       child: TabBar(
         controller: _tabController,
-        tabs: const [
-          Tab(text: 'Staff Directory'),
-          Tab(text: 'Duty Roster Planner'),
-          Tab(text: 'Verification Queue'),
+        tabs: [
+          Tab(text: tr('hospital_staff_tab_directory')),
+          Tab(text: tr('hospital_staff_tab_roster')),
+          Tab(text: tr('hospital_staff_tab_verification')),
         ],
         isScrollable: true,
         labelColor: AppColors.primary,
@@ -193,6 +216,7 @@ class _StaffManagementPageState extends ConsumerState<StaffManagementPage> with 
   }
 
   Widget _buildDirectoryTab() {
+    final tr = ref.watch(translationsProvider);
     final staffList = ref.watch(staffRosterProvider);
     final query = _searchController.text.toLowerCase();
     
@@ -216,9 +240,9 @@ class _StaffManagementPageState extends ConsumerState<StaffManagementPage> with 
                   Expanded(
                     child: TextField(
                       controller: _searchController,
-                      decoration: const InputDecoration(
-                        hintText: 'Search staff by name or department...',
-                        prefixIcon: Icon(Icons.search_rounded),
+                      decoration: InputDecoration(
+                        hintText: tr('hospital_staff_search_hint'),
+                        prefixIcon: const Icon(Icons.search_rounded),
                       ),
                       onChanged: (_) => setState(() {}),
                     ),
@@ -231,9 +255,13 @@ class _StaffManagementPageState extends ConsumerState<StaffManagementPage> with 
                         setState(() => _selectedRoleFilter = val);
                       }
                     },
-                    items: ['All', 'Doctor', 'Nurse', 'Technician', 'Pharmacist']
-                        .map((r) => DropdownMenuItem(value: r, child: Text(r)))
-                        .toList(),
+                    items: [
+                      DropdownMenuItem(value: 'All', child: Text(tr('hospital_staff_role_all'))),
+                      DropdownMenuItem(value: 'Doctor', child: Text(tr('hospital_staff_role_doctor'))),
+                      DropdownMenuItem(value: 'Nurse', child: Text(tr('hospital_staff_role_nurse'))),
+                      DropdownMenuItem(value: 'Technician', child: Text(tr('hospital_staff_role_technician'))),
+                      DropdownMenuItem(value: 'Pharmacist', child: Text(tr('hospital_staff_role_pharmacist'))),
+                    ],
                   ),
                 ],
               ),
@@ -243,26 +271,26 @@ class _StaffManagementPageState extends ConsumerState<StaffManagementPage> with 
             Expanded(
               child: filtered.isEmpty
                   ? Center(
-                      child: Text('No staff matches filter criteria', style: GoogleFonts.inter(color: AppColors.textSecondary)),
+                      child: Text(tr('hospital_staff_no_match'), style: GoogleFonts.inter(color: AppColors.textSecondary)),
                     )
                   : SingleChildScrollView(
                       scrollDirection: Axis.vertical,
                       child: SizedBox(
                         width: double.infinity,
                         child: DataTable(
-                          columns: const [
-                            DataColumn(label: Text('Name')),
-                            DataColumn(label: Text('Role')),
-                            DataColumn(label: Text('Department')),
-                            DataColumn(label: Text('Shift (Mon)')),
-                            DataColumn(label: Text('Status')),
+                          columns: [
+                            DataColumn(label: Text(tr('hospital_staff_col_name'))),
+                            DataColumn(label: Text(tr('hospital_staff_col_role'))),
+                            DataColumn(label: Text(tr('hospital_staff_col_department'))),
+                            DataColumn(label: Text(tr('hospital_staff_col_shift_mon'))),
+                            DataColumn(label: Text(tr('hospital_staff_col_status'))),
                           ],
                           rows: filtered.map((staff) {
                             return DataRow(cells: [
                               DataCell(Text(staff.name, style: GoogleFonts.inter(fontWeight: FontWeight.bold))),
                               DataCell(Text(staff.role)),
                               DataCell(Text(staff.dept)),
-                              DataCell(Text(staff.shifts['Monday'] ?? 'Off')),
+                              DataCell(Text(_trShift(staff.shifts['Monday'] ?? 'Off'))),
                               DataCell(
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -271,7 +299,7 @@ class _StaffManagementPageState extends ConsumerState<StaffManagementPage> with 
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Text(
-                                    staff.status,
+                                    staff.status == 'Active' ? tr('hospital_staff_status_active') : staff.status,
                                     style: GoogleFonts.inter(color: AppColors.success, fontSize: 11, fontWeight: FontWeight.bold),
                                   ),
                                 ),
@@ -288,7 +316,36 @@ class _StaffManagementPageState extends ConsumerState<StaffManagementPage> with 
     );
   }
 
+  String _trDay(String day) {
+    final tr = ref.watch(translationsProvider);
+    const keys = {
+      'Saturday': 'hospital_staff_day_saturday',
+      'Sunday': 'hospital_staff_day_sunday',
+      'Monday': 'hospital_staff_day_monday',
+      'Tuesday': 'hospital_staff_day_tuesday',
+      'Wednesday': 'hospital_staff_day_wednesday',
+      'Thursday': 'hospital_staff_day_thursday',
+      'Friday': 'hospital_staff_day_friday',
+    };
+    final key = keys[day];
+    return key != null ? tr(key) : day;
+  }
+
+  String _trShift(String shift) {
+    final tr = ref.watch(translationsProvider);
+    const keys = {
+      'Off': 'hospital_staff_shift_off',
+      'OPD': 'hospital_staff_shift_opd',
+      'Ward': 'hospital_staff_shift_ward',
+      'Emergency': 'hospital_staff_shift_emergency',
+      'Night': 'hospital_staff_shift_night',
+    };
+    final key = keys[shift];
+    return key != null ? tr(key) : shift;
+  }
+
   Widget _buildRosterTab() {
+    final tr = ref.watch(translationsProvider);
     final List<String> days = ['Saturday', 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
     final staffList = ref.watch(staffRosterProvider);
     final clinicalStaff = staffList.where((s) => s.role == 'Doctor' || s.role == 'Nurse').toList();
@@ -303,8 +360,8 @@ class _StaffManagementPageState extends ConsumerState<StaffManagementPage> with 
             scrollDirection: Axis.vertical,
             child: DataTable(
               columns: [
-                const DataColumn(label: Text('Staff Member')),
-                ...days.map((d) => DataColumn(label: Text(d))),
+                DataColumn(label: Text(tr('hospital_staff_col_staff_member'))),
+                ...days.map((d) => DataColumn(label: Text(_trDay(d)))),
               ],
               rows: clinicalStaff.map((staff) {
                 return DataRow(
@@ -340,7 +397,7 @@ class _StaffManagementPageState extends ConsumerState<StaffManagementPage> with 
                               border: Border.all(color: color.withOpacity(0.15)),
                             ),
                             child: Text(
-                              shift,
+                              _trShift(shift),
                               style: GoogleFonts.inter(color: color, fontSize: 11, fontWeight: FontWeight.bold),
                             ),
                           ),
@@ -358,6 +415,7 @@ class _StaffManagementPageState extends ConsumerState<StaffManagementPage> with 
   }
 
   Widget _buildApplicationsTab() {
+    final tr = ref.watch(translationsProvider);
     final pendingDoctors = ref.watch(doctorVerificationsProvider).where((r) => r.status == 'Pending').toList();
 
     return pendingDoctors.isEmpty
@@ -368,12 +426,12 @@ class _StaffManagementPageState extends ConsumerState<StaffManagementPage> with 
                 const Icon(Icons.check_circle_rounded, size: 54, color: AppColors.success),
                 const SizedBox(height: 16),
                 Text(
-                  'All Applications Reviewed',
+                  tr('hospital_staff_all_reviewed'),
                   style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'No pending doctor affiliations at this time.',
+                  tr('hospital_staff_no_pending'),
                   style: GoogleFonts.inter(color: AppColors.textSecondary, fontSize: 13),
                 ),
               ],
@@ -407,9 +465,9 @@ class _StaffManagementPageState extends ConsumerState<StaffManagementPage> with 
                         children: [
                           Text(doc.name, style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold)),
                           const SizedBox(height: 4),
-                          Text('BMDC Registration: ${doc.bmdcNo}', style: GoogleFonts.inter(color: AppColors.textSecondary, fontSize: 12)),
-                          Text('Specialization: ${doc.specialization}', style: GoogleFonts.inter(color: AppColors.textSecondary, fontSize: 12)),
-                          Text('Submitted Date: ${doc.date}', style: GoogleFonts.inter(color: AppColors.textSecondary, fontSize: 12)),
+                          Text('${tr('hospital_staff_bmdc_registration')}: ${doc.bmdcNo}', style: GoogleFonts.inter(color: AppColors.textSecondary, fontSize: 12)),
+                          Text('${tr('hospital_staff_specialization')}: ${doc.specialization}', style: GoogleFonts.inter(color: AppColors.textSecondary, fontSize: 12)),
+                          Text('${tr('hospital_staff_submitted_date')}: ${doc.date}', style: GoogleFonts.inter(color: AppColors.textSecondary, fontSize: 12)),
                           const SizedBox(height: 16),
                           Row(
                             children: [
@@ -418,7 +476,7 @@ class _StaffManagementPageState extends ConsumerState<StaffManagementPage> with 
                                   _showCredentialsDialog(doc);
                                 },
                                 icon: const Icon(Icons.description_rounded, size: 16),
-                                label: const Text('View Credentials'),
+                                label: Text(tr('hospital_staff_view_credentials')),
                                 style: OutlinedButton.styleFrom(
                                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                 ),
@@ -437,7 +495,7 @@ class _StaffManagementPageState extends ConsumerState<StaffManagementPage> with 
                             side: const BorderSide(color: AppColors.danger),
                             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                           ),
-                          child: const Text('Reject'),
+                          child: Text(tr('hospital_staff_reject')),
                         ),
                         const SizedBox(width: 12),
                         ElevatedButton(
@@ -446,7 +504,7 @@ class _StaffManagementPageState extends ConsumerState<StaffManagementPage> with 
                             backgroundColor: AppColors.success,
                             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                           ),
-                          child: const Text('Approve Affiliation'),
+                          child: Text(tr('hospital_staff_approve_affiliation')),
                         ),
                       ],
                     ),
@@ -458,25 +516,26 @@ class _StaffManagementPageState extends ConsumerState<StaffManagementPage> with 
   }
 
   void _showCredentialsDialog(DoctorVerificationRequest doc) {
+    final tr = ref.read(translationsProvider);
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text('${doc.name} - Credentials Summary', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+          title: Text('${doc.name} - ${tr('hospital_staff_credentials_summary')}', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildCredentialItem('Medical Board License', 'BMDC Verification Status: VALIDATED (National Database Link)'),
-              _buildCredentialItem('Degree Certificate', 'MBBS, MD - Dhaka Medical College (Verified)'),
-              _buildCredentialItem('NID Match', 'Verified with Bangladesh Election Commission databases'),
-              _buildCredentialItem('Specialist Qualification', 'Fellowship of College of Physicians and Surgeons (FCPS)'),
+              _buildCredentialItem(tr('hospital_staff_cred_license_title'), tr('hospital_staff_cred_license_desc')),
+              _buildCredentialItem(tr('hospital_staff_cred_degree_title'), tr('hospital_staff_cred_degree_desc')),
+              _buildCredentialItem(tr('hospital_staff_cred_nid_title'), tr('hospital_staff_cred_nid_desc')),
+              _buildCredentialItem(tr('hospital_staff_cred_specialist_title'), tr('hospital_staff_cred_specialist_desc')),
             ],
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Close'),
+              child: Text(tr('hospital_staff_close')),
             )
           ],
         );
@@ -508,6 +567,7 @@ class _StaffManagementPageState extends ConsumerState<StaffManagementPage> with 
   }
 
   void _showAddStaffDialog() {
+    final tr = ref.read(translationsProvider);
     final nameCont = TextEditingController();
     String role = 'Doctor';
     String dept = 'Cardiology';
@@ -519,47 +579,57 @@ class _StaffManagementPageState extends ConsumerState<StaffManagementPage> with 
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              title: Text('Add New Staff Member', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+              title: Text(tr('hospital_staff_add_new_member'), style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   TextField(
                     controller: nameCont,
-                    decoration: const InputDecoration(labelText: 'Full Name', hintText: 'e.g., Dr. Amina Islam'),
+                    decoration: InputDecoration(labelText: tr('hospital_staff_full_name'), hintText: tr('hospital_staff_full_name_hint')),
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
                     value: role,
-                    decoration: const InputDecoration(labelText: 'Role'),
+                    decoration: InputDecoration(labelText: tr('hospital_staff_field_role')),
                     onChanged: (val) => setDialogState(() => role = val!),
-                    items: ['Doctor', 'Nurse', 'Technician', 'Pharmacist']
-                        .map((r) => DropdownMenuItem(value: r, child: Text(r)))
-                        .toList(),
+                    items: [
+                      DropdownMenuItem(value: 'Doctor', child: Text(tr('hospital_staff_role_doctor'))),
+                      DropdownMenuItem(value: 'Nurse', child: Text(tr('hospital_staff_role_nurse'))),
+                      DropdownMenuItem(value: 'Technician', child: Text(tr('hospital_staff_role_technician'))),
+                      DropdownMenuItem(value: 'Pharmacist', child: Text(tr('hospital_staff_role_pharmacist'))),
+                    ],
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
                     value: dept,
-                    decoration: const InputDecoration(labelText: 'Department'),
+                    decoration: InputDecoration(labelText: tr('hospital_staff_field_department')),
                     onChanged: (val) => setDialogState(() => dept = val!),
-                    items: ['Cardiology', 'Emergency', 'Pediatrics', 'Laboratory', 'Pharmacy', 'General Ward']
-                        .map((d) => DropdownMenuItem(value: d, child: Text(d)))
-                        .toList(),
+                    items: [
+                      DropdownMenuItem(value: 'Cardiology', child: Text(tr('hospital_staff_dept_cardiology'))),
+                      DropdownMenuItem(value: 'Emergency', child: Text(tr('hospital_staff_dept_emergency'))),
+                      DropdownMenuItem(value: 'Pediatrics', child: Text(tr('hospital_staff_dept_pediatrics'))),
+                      DropdownMenuItem(value: 'Laboratory', child: Text(tr('hospital_staff_dept_laboratory'))),
+                      DropdownMenuItem(value: 'Pharmacy', child: Text(tr('hospital_staff_dept_pharmacy'))),
+                      DropdownMenuItem(value: 'General Ward', child: Text(tr('hospital_staff_dept_general_ward'))),
+                    ],
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
                     value: shift,
-                    decoration: const InputDecoration(labelText: 'Shift'),
+                    decoration: InputDecoration(labelText: tr('hospital_staff_field_shift')),
                     onChanged: (val) => setDialogState(() => shift = val!),
-                    items: ['Morning', 'Evening', 'Night']
-                        .map((s) => DropdownMenuItem(value: s, child: Text(s)))
-                        .toList(),
+                    items: [
+                      DropdownMenuItem(value: 'Morning', child: Text(tr('hospital_staff_shift_morning'))),
+                      DropdownMenuItem(value: 'Evening', child: Text(tr('hospital_staff_shift_evening'))),
+                      DropdownMenuItem(value: 'Night', child: Text(tr('hospital_staff_shift_night'))),
+                    ],
                   ),
                 ],
               ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancel'),
+                  child: Text(tr('hospital_staff_cancel')),
                 ),
                 ElevatedButton(
                   onPressed: () {
@@ -568,7 +638,7 @@ class _StaffManagementPageState extends ConsumerState<StaffManagementPage> with 
                       Navigator.pop(context);
                     }
                   },
-                  child: const Text('Add Staff'),
+                  child: Text(tr('hospital_staff_add_staff')),
                 ),
               ],
             );

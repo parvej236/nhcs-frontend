@@ -5,6 +5,7 @@ import 'package:uhcs/features/patient/data/models/appointment.dart';
 import 'package:uhcs/features/hospital/data/repositories/hospital_repository.dart';
 import 'package:uhcs/features/hospital/data/models/reception_queue_item.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/providers/language_provider.dart';
 import '../presentation/providers/hospital_providers.dart';
 
 class ReceptionQueuePage extends ConsumerStatefulWidget {
@@ -70,18 +71,20 @@ class _ReceptionQueuePageState extends ConsumerState<ReceptionQueuePage> {
       });
 
       if (mounted) {
+        final tr = ref.read(translationsProvider);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Checked in Rahim Islam for ${app.doctor.specialization} Queue!'),
+            content: Text('${tr('hospital_recep_checked_in_prefix')} Rahim Islam ${tr('hospital_recep_checked_in_mid')} ${app.doctor.specialization} ${tr('hospital_recep_checked_in_suffix')}'),
             backgroundColor: AppColors.success,
           ),
         );
       }
     } catch (e) {
       if (mounted) {
+        final tr = ref.read(translationsProvider);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to check in patient. please try again.'),
+          SnackBar(
+            content: Text(tr('hospital_recep_checkin_failed')),
             backgroundColor: AppColors.danger,
           ),
         );
@@ -102,6 +105,7 @@ class _ReceptionQueuePageState extends ConsumerState<ReceptionQueuePage> {
     final queueList = ref.watch(receptionQueueProvider);
     final filteredQueue = queueList.where((p) => p.dept == _selectedDept).toList();
     final t = AppColors.of(context);
+    final tr = ref.watch(translationsProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -117,12 +121,12 @@ class _ReceptionQueuePageState extends ConsumerState<ReceptionQueuePage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Patient Check-In Desk',
+                    tr('hospital_recep_checkin_desk_title'),
                     style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.bold, color: t.textPrimary),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Search for registered patients by Digital Health ID, NID or name to verify bookings and check in.',
+                    tr('hospital_recep_checkin_desk_subtitle'),
                     style: GoogleFonts.inter(color: t.textSecondary, fontSize: 13),
                   ),
                   const SizedBox(height: 24),
@@ -168,6 +172,7 @@ class _ReceptionQueuePageState extends ConsumerState<ReceptionQueuePage> {
 
   Widget _buildSearchCard() {
     final t = AppColors.of(context);
+    final tr = ref.watch(translationsProvider);
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -179,7 +184,7 @@ class _ReceptionQueuePageState extends ConsumerState<ReceptionQueuePage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Lookup Citizen Record',
+            tr('hospital_recep_lookup_title'),
             style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w600, color: t.textPrimary),
           ),
           const SizedBox(height: 16),
@@ -190,9 +195,9 @@ class _ReceptionQueuePageState extends ConsumerState<ReceptionQueuePage> {
                   controller: _searchController,
                   style: GoogleFonts.inter(color: t.textPrimary),
                   decoration: InputDecoration(
-                    labelText: 'NHCS Health ID / NID / Name',
+                    labelText: tr('hospital_recep_search_label'),
                     labelStyle: TextStyle(color: t.textSecondary),
-                    hintText: 'e.g., NUD-000-1 or Rahim Islam',
+                    hintText: tr('hospital_recep_search_hint'),
                     hintStyle: TextStyle(color: t.textSecondary.withValues(alpha: 0.5)),
                     prefixIcon: Icon(Icons.badge_outlined, color: t.textSecondary),
                     enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: t.border)),
@@ -205,7 +210,7 @@ class _ReceptionQueuePageState extends ConsumerState<ReceptionQueuePage> {
               ElevatedButton.icon(
                 onPressed: _searchPatient,
                 icon: const Icon(Icons.search_rounded),
-                label: const Text('Find Patient'),
+                label: Text(tr('hospital_recep_find_patient')),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: t.brandPrimary,
                   foregroundColor: Colors.white,
@@ -216,7 +221,7 @@ class _ReceptionQueuePageState extends ConsumerState<ReceptionQueuePage> {
           ),
           const SizedBox(height: 12),
           Text(
-            'Try searching "NUD-000-1" (Rahim Islam) or patient name',
+            tr('hospital_recep_search_help'),
             style: GoogleFonts.inter(fontSize: 11, color: t.textSecondary, fontStyle: FontStyle.italic),
           ),
         ],
@@ -226,6 +231,7 @@ class _ReceptionQueuePageState extends ConsumerState<ReceptionQueuePage> {
 
   Widget _buildSearchResultSection() {
     final t = AppColors.of(context);
+    final tr = ref.watch(translationsProvider);
 
     if (_isSearching) {
       return const Center(
@@ -250,12 +256,12 @@ class _ReceptionQueuePageState extends ConsumerState<ReceptionQueuePage> {
               Icon(Icons.person_search_rounded, size: 48, color: t.textSecondary.withValues(alpha: 0.5)),
               const SizedBox(height: 16),
               Text(
-                'No Citizen Record Found',
+                tr('hospital_recep_no_record_title'),
                 style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: t.textPrimary),
               ),
               const SizedBox(height: 8),
               Text(
-                'Verify the Health ID or name, and ensure they have an approved appointment.',
+                tr('hospital_recep_no_record_subtitle'),
                 textAlign: TextAlign.center,
                 style: GoogleFonts.inter(color: t.textSecondary, fontSize: 13),
               ),
@@ -272,6 +278,7 @@ class _ReceptionQueuePageState extends ConsumerState<ReceptionQueuePage> {
 
   Widget _buildSingleSearchResult(Appointment app) {
     final t = AppColors.of(context);
+    final tr = ref.watch(translationsProvider);
     final isApproved = app.approvalStatus == 'APPROVED';
     final isCheckedIn = app.arrivalStatus == 'CHECKED_IN' || app.arrivalStatus == 'COMPLETED';
 
@@ -302,8 +309,8 @@ class _ReceptionQueuePageState extends ConsumerState<ReceptionQueuePage> {
                 const SizedBox(width: 8),
                 Text(
                   isApproved
-                      ? (isCheckedIn ? 'Checked In' : 'Active Booking Verified')
-                      : 'Pending Approval',
+                      ? (isCheckedIn ? tr('hospital_recep_status_checked_in') : tr('hospital_recep_status_active_booking'))
+                      : tr('hospital_recep_status_pending_approval'),
                   style: GoogleFonts.inter(
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
@@ -339,7 +346,7 @@ class _ReceptionQueuePageState extends ConsumerState<ReceptionQueuePage> {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'Health ID: ${app.patientHealthId}',
+                            '${tr('hospital_recep_health_id')} ${app.patientHealthId}',
                             style: GoogleFonts.inter(color: t.textSecondary, fontSize: 12),
                           ),
                         ],
@@ -350,12 +357,12 @@ class _ReceptionQueuePageState extends ConsumerState<ReceptionQueuePage> {
                 const SizedBox(height: 20),
                 const Divider(),
                 const SizedBox(height: 12),
-                _buildDetailRow('National ID', app.patientNid.isNotEmpty ? app.patientNid : '8210398457'),
-                _buildDetailRow('Age / Gender', '${app.patientAge} years • ${app.patientGender}'),
-                _buildDetailRow('Blood Group', app.patientBloodGroup),
-                _buildDetailRow('Scheduled Specialty', app.doctor.specialization),
-                _buildDetailRow('Assigned Doctor', app.doctor.name),
-                _buildDetailRow('Time slot', '${app.date.toIso8601String().split('T')[0]} @ ${app.timeSlot}'),
+                _buildDetailRow(tr('hospital_recep_national_id'), app.patientNid.isNotEmpty ? app.patientNid : '8210398457'),
+                _buildDetailRow(tr('hospital_recep_age_gender'), '${app.patientAge} ${tr('hospital_recep_years')} • ${app.patientGender}'),
+                _buildDetailRow(tr('hospital_recep_blood_group'), app.patientBloodGroup),
+                _buildDetailRow(tr('hospital_recep_scheduled_specialty'), app.doctor.specialization),
+                _buildDetailRow(tr('hospital_recep_assigned_doctor'), app.doctor.name),
+                _buildDetailRow(tr('hospital_recep_time_slot'), '${app.date.toIso8601String().split('T')[0]} @ ${app.timeSlot}'),
                 const SizedBox(height: 24),
                 if (isCheckedIn)
                   Container(
@@ -367,7 +374,7 @@ class _ReceptionQueuePageState extends ConsumerState<ReceptionQueuePage> {
                     ),
                     child: Center(
                       child: Text(
-                        'Already Checked In • Queue No: ${app.queueNumber}',
+                        '${tr('hospital_recep_already_checked_in')} ${app.queueNumber}',
                         style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: t.success),
                       ),
                     ),
@@ -382,7 +389,7 @@ class _ReceptionQueuePageState extends ConsumerState<ReceptionQueuePage> {
                     ),
                     child: Center(
                       child: Text(
-                        'Requires Command Center Approval First',
+                        tr('hospital_recep_requires_approval'),
                         style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: t.warning),
                       ),
                     ),
@@ -393,7 +400,7 @@ class _ReceptionQueuePageState extends ConsumerState<ReceptionQueuePage> {
                     child: ElevatedButton.icon(
                       onPressed: () => _checkInPatient(app),
                       icon: const Icon(Icons.check_circle_outline_rounded),
-                      label: const Text('Confirm Check-In & Issue Queue Ticket'),
+                      label: Text(tr('hospital_recep_confirm_checkin')),
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         backgroundColor: t.success,
@@ -426,6 +433,7 @@ class _ReceptionQueuePageState extends ConsumerState<ReceptionQueuePage> {
 
   Widget _buildQueueDashboardHeader() {
     final t = AppColors.of(context);
+    final tr = ref.watch(translationsProvider);
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -439,36 +447,69 @@ class _ReceptionQueuePageState extends ConsumerState<ReceptionQueuePage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Live Queue Dashboard',
+                tr('hospital_recep_dashboard_title'),
                 style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.bold, color: t.textPrimary),
               ),
               const SizedBox(height: 4),
               Text(
-                'Track patient transit and consultation status across clinics.',
+                tr('hospital_recep_dashboard_subtitle'),
                 style: GoogleFonts.inter(color: t.textSecondary, fontSize: 13),
               ),
             ],
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: t.brandPrimary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.timer_outlined, color: t.brandPrimary, size: 18),
-                const SizedBox(width: 8),
-                Text(
-                  'Average Wait: 18m',
-                  style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: t.brandPrimary, fontSize: 13),
+          Row(
+            children: [
+              IconButton(
+                icon: Icon(Icons.refresh_rounded, color: t.brandPrimary),
+                tooltip: tr('hospital_recep_reload'),
+                onPressed: () {
+                  ref.invalidate(receptionQueueProvider);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(tr('hospital_recep_reloaded')), duration: const Duration(seconds: 1)),
+                  );
+                },
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: t.brandPrimary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-              ],
-            ),
+                child: Row(
+                  children: [
+                    Icon(Icons.timer_outlined, color: t.brandPrimary, size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      tr('hospital_recep_average_wait'),
+                      style: GoogleFonts.inter(fontWeight: FontWeight.bold, color: t.brandPrimary, fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
+  }
+
+  String _deptLabel(String dept) {
+    final tr = ref.watch(translationsProvider);
+    switch (dept) {
+      case 'Emergency':
+        return tr('hospital_recep_dept_emergency');
+      case 'Cardiology':
+        return tr('hospital_recep_dept_cardiology');
+      case 'ICU':
+        return tr('hospital_recep_dept_icu');
+      case 'General Ward':
+        return tr('hospital_recep_dept_general_ward');
+      case 'Pediatrics':
+        return tr('hospital_recep_dept_pediatrics');
+      default:
+        return dept;
+    }
   }
 
   Widget _buildDepartmentTabs() {
@@ -491,7 +532,7 @@ class _ReceptionQueuePageState extends ConsumerState<ReceptionQueuePage> {
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
             child: ChoiceChip(
-              label: Text(dept),
+              label: Text(_deptLabel(dept)),
               selected: isSelected,
               onSelected: (selected) {
                 if (selected) {
@@ -515,6 +556,7 @@ class _ReceptionQueuePageState extends ConsumerState<ReceptionQueuePage> {
 
   Widget _buildEmptyQueue() {
     final t = AppColors.of(context);
+    final tr = ref.watch(translationsProvider);
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -522,12 +564,12 @@ class _ReceptionQueuePageState extends ConsumerState<ReceptionQueuePage> {
           Icon(Icons.people_outline_rounded, size: 64, color: t.textSecondary.withValues(alpha: 0.3)),
           const SizedBox(height: 16),
           Text(
-            'Queue is Empty',
+            tr('hospital_recep_queue_empty_title'),
             style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: t.textPrimary),
           ),
           const SizedBox(height: 8),
           Text(
-            'No checked-in patients in the $_selectedDept clinic.',
+            '${tr('hospital_recep_no_patients_prefix')} $_selectedDept ${tr('hospital_recep_no_patients_suffix')}',
             style: GoogleFonts.inter(color: t.textSecondary, fontSize: 13),
           ),
         ],
@@ -537,6 +579,7 @@ class _ReceptionQueuePageState extends ConsumerState<ReceptionQueuePage> {
 
   Widget _buildQueueCard(ReceptionQueueItem patient) {
     final t = AppColors.of(context);
+    final tr = ref.watch(translationsProvider);
     Color statusColor;
     switch (patient.status) {
       case 'In Consultation':
@@ -580,7 +623,7 @@ class _ReceptionQueuePageState extends ConsumerState<ReceptionQueuePage> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${patient.age} yrs • ${patient.gender} • Dr. Ahmed Khan',
+                  '${patient.age} ${tr('hospital_recep_yrs')} • ${patient.gender} • Dr. Ahmed Khan',
                   style: GoogleFonts.inter(color: t.textSecondary, fontSize: 12),
                 ),
               ],
@@ -606,7 +649,7 @@ class _ReceptionQueuePageState extends ConsumerState<ReceptionQueuePage> {
                   onTap: () => _updateStatus(patient.queueNo, 'In Consultation'),
                   child: Row(
                     children: [
-                      Text('Start Consultation', style: GoogleFonts.inter(color: t.brandPrimary, fontSize: 12, fontWeight: FontWeight.bold)),
+                      Text(tr('hospital_recep_start_consultation'), style: GoogleFonts.inter(color: t.brandPrimary, fontSize: 12, fontWeight: FontWeight.bold)),
                       Icon(Icons.chevron_right_rounded, size: 16, color: t.brandPrimary),
                     ],
                   ),
@@ -616,7 +659,7 @@ class _ReceptionQueuePageState extends ConsumerState<ReceptionQueuePage> {
                   onTap: () => _updateStatus(patient.queueNo, 'Completed'),
                   child: Row(
                     children: [
-                      Text('Complete Session', style: GoogleFonts.inter(color: t.success, fontSize: 12, fontWeight: FontWeight.bold)),
+                      Text(tr('hospital_recep_complete_session'), style: GoogleFonts.inter(color: t.success, fontSize: 12, fontWeight: FontWeight.bold)),
                       Icon(Icons.check_rounded, size: 16, color: t.success),
                     ],
                   ),

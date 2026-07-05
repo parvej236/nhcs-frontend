@@ -2,11 +2,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:uhcs/features/patient/data/models/appointment.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/ai_insight_panel.dart';
 import '../../../core/widgets/notification_dropdown.dart';
 import '../../../core/providers/notifications_provider.dart';
+import '../../../core/providers/language_provider.dart';
 import '../presentation/providers/hospital_providers.dart';
 
 class CommandCenterPage extends ConsumerStatefulWidget {
@@ -19,7 +19,6 @@ class CommandCenterPage extends ConsumerStatefulWidget {
 class _CommandCenterPageState extends ConsumerState<CommandCenterPage> {
   bool _isRefreshing = false;
   DateTime _lastUpdated = DateTime.now();
-  int _activeSubTab = 0;
 
   void _simulateRefresh() {
     setState(() {
@@ -46,66 +45,14 @@ class _CommandCenterPageState extends ConsumerState<CommandCenterPage> {
       body: Column(
         children: [
           _buildHeader(notifications),
-          _buildSubTabBar(),
-          Expanded(
-            child: _activeSubTab == 0
-                ? _buildDashboardContent()
-                : _buildApprovalsContent(),
-          ),
+          Expanded(child: _buildDashboardContent()),
         ],
-      ),
-    );
-  }
-
-  Widget _buildSubTabBar() {
-    final t = AppColors.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-      decoration: BoxDecoration(
-        color: t.bgCard,
-        border: Border(bottom: BorderSide(color: t.border)),
-      ),
-      child: Row(
-        children: [
-          _buildTabButton(0, 'Operations Overview', Icons.dashboard_rounded),
-          const SizedBox(width: 16),
-          _buildTabButton(1, 'Appointment Approvals', Icons.fact_check_rounded),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTabButton(int index, String title, IconData icon) {
-    final t = AppColors.of(context);
-    final isSelected = _activeSubTab == index;
-    return InkWell(
-      onTap: () => setState(() => _activeSubTab = index),
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? t.brandPrimary.withValues(alpha: 0.1) : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: isSelected ? t.brandPrimary : t.textSecondary, size: 18),
-            const SizedBox(width: 8),
-            Text(
-              title,
-              style: GoogleFonts.inter(
-                color: isSelected ? t.brandPrimary : t.textSecondary,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                fontSize: 14,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
 
   Widget _buildDashboardContent() {
+    final tr = ref.watch(translationsProvider);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -119,14 +66,14 @@ class _CommandCenterPageState extends ConsumerState<CommandCenterPage> {
               children: [
                 _buildStatsGrid(),
                 const SizedBox(height: 24),
-                const AiInsightPanel(
-                  title: 'ICU & Workforce Optimization Forecast',
-                  description: 'AI model predicts a 15% increase in emergency intake over the next 6 hours due to local holiday traffic. ICU capacity is currently at critical levels.',
+                AiInsightPanel(
+                  title: tr('hospital_cc_ai_forecast_title'),
+                  description: tr('hospital_cc_ai_forecast_desc'),
                   type: 'warning',
                   recommendations: [
-                    'Pre-emptively route non-emergency triage to OPD wings.',
-                    'Onboard call-shift nurses for the 8 PM - 2 AM block.',
-                    'Coordinate with Dhaka South general ward for tertiary back-up beds.'
+                    tr('hospital_cc_ai_rec_1'),
+                    tr('hospital_cc_ai_rec_2'),
+                    tr('hospital_cc_ai_rec_3'),
                   ],
                 ),
                 const SizedBox(height: 24),
@@ -157,206 +104,8 @@ class _CommandCenterPageState extends ConsumerState<CommandCenterPage> {
     );
   }
 
-  Widget _buildApprovalsContent() {
-    final pendingState = ref.watch(pendingAppointmentsProvider);
-    final t = AppColors.of(context);
-
-    return pendingState.when(
-      loading: () => const Center(
-        child: CircularProgressIndicator(color: AppColors.primary),
-      ),
-      error: (err, stack) => Center(
-        child: Text(
-          'Error loading pending appointments: $err',
-          style: GoogleFonts.inter(color: t.danger),
-        ),
-      ),
-      data: (appointments) {
-        if (appointments.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.done_all_rounded, size: 64, color: t.success.withValues(alpha: 0.6)),
-                const SizedBox(height: 16),
-                Text(
-                  'All caught up!',
-                  style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: t.textPrimary),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'No pending appointment requests need verification.',
-                  style: GoogleFonts.inter(color: t.textSecondary, fontSize: 14),
-                ),
-              ],
-            ),
-          );
-        }
-
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Appointment Verification Queue',
-                style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.bold, color: t.textPrimary),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Verify citizen details and doctor schedule compatibility before approving medical bookings.',
-                style: GoogleFonts.inter(color: t.textSecondary, fontSize: 14),
-              ),
-              const SizedBox(height: 24),
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                  maxCrossAxisExtent: 450,
-                  mainAxisExtent: 220,
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
-                ),
-                itemCount: appointments.length,
-                itemBuilder: (context, index) {
-                  final app = appointments[index];
-                  return _buildApprovalCard(app);
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildApprovalCard(Appointment app) {
-    final t = AppColors.of(context);
-    final patientIdStr = 'NUD-000-${app.id.hashCode.abs() % 100}'; // Clean Health ID mapping
-    
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: t.bgCard,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: t.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              CircleAvatar(
-                backgroundColor: t.brandPrimary.withValues(alpha: 0.1),
-                child: Icon(Icons.person_rounded, color: t.brandPrimary, size: 20),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Rahim Islam', // We know the seeded patient name is Rahim Islam
-                      style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 15, color: t.textPrimary),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Health ID: $patientIdStr',
-                      style: GoogleFonts.inter(color: t.textSecondary, fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: t.warning.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  'PENDING',
-                  style: GoogleFonts.inter(color: t.warning, fontSize: 10, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          const Divider(height: 1),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Icon(Icons.medical_services_outlined, size: 16, color: t.textSecondary),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  '${app.doctor.name} (${app.doctor.specialization})',
-                  style: GoogleFonts.inter(fontSize: 13, color: t.textPrimary, fontWeight: FontWeight.w500),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Icon(Icons.calendar_today_outlined, size: 16, color: t.textSecondary),
-              const SizedBox(width: 8),
-              Text(
-                '${app.date.year}-${app.date.month.toString().padLeft(2, '0')}-${app.date.day.toString().padLeft(2, '0')} • ${app.timeSlot}',
-                style: GoogleFonts.inter(fontSize: 13, color: t.textPrimary),
-              ),
-            ],
-          ),
-          const Spacer(),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () async {
-                    final success = await ref.read(pendingAppointmentsProvider.notifier).rejectAppointment(app.id);
-                    if (success && mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Appointment ${app.id} rejected.'), backgroundColor: t.danger),
-                      );
-                    }
-                  },
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: t.danger,
-                    side: BorderSide(color: t.danger.withValues(alpha: 0.3)),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                  child: Text('Reject', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () async {
-                    final success = await ref.read(pendingAppointmentsProvider.notifier).approveAppointment(app.id);
-                    if (success && mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Appointment ${app.id} approved!'), backgroundColor: t.success),
-                      );
-                      // Trigger stats reload
-                      ref.read(hospitalDashboardStatsProvider.notifier).refresh();
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: t.brandPrimary,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    elevation: 0,
-                  ),
-                  child: Text('Verify & Approve', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildHeader(List<AppNotification> notifications) {
+    final tr = ref.watch(translationsProvider);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       decoration: BoxDecoration(
@@ -369,7 +118,7 @@ class _CommandCenterPageState extends ConsumerState<CommandCenterPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Dhaka Central Hospital',
+                tr('hospital_cc_hospital_name'),
                 style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
               ),
               const SizedBox(height: 4),
@@ -385,7 +134,7 @@ class _CommandCenterPageState extends ConsumerState<CommandCenterPage> {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    'Connected to National Ecosystem • Live Feed',
+                    tr('hospital_cc_connected_status'),
                     style: GoogleFonts.inter(fontSize: 12, color: AppColors.textSecondary),
                   ),
                 ],
@@ -394,7 +143,7 @@ class _CommandCenterPageState extends ConsumerState<CommandCenterPage> {
           ),
           const Spacer(),
           Text(
-            'Last Sync: ${_lastUpdated.hour.toString().padLeft(2, '0')}:${_lastUpdated.minute.toString().padLeft(2, '0')}:${_lastUpdated.second.toString().padLeft(2, '0')}',
+            '${tr('hospital_cc_last_sync')}: ${_lastUpdated.hour.toString().padLeft(2, '0')}:${_lastUpdated.minute.toString().padLeft(2, '0')}:${_lastUpdated.second.toString().padLeft(2, '0')}',
             style: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 13),
           ),
           const SizedBox(width: 16),
@@ -407,7 +156,7 @@ class _CommandCenterPageState extends ConsumerState<CommandCenterPage> {
                     child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
                   )
                 : const Icon(Icons.refresh_rounded, color: AppColors.primary),
-            tooltip: 'Sync Live Data',
+            tooltip: tr('hospital_cc_sync_live_data'),
           ),
           const SizedBox(width: 16),
           NotificationDropdown(
@@ -425,6 +174,7 @@ class _CommandCenterPageState extends ConsumerState<CommandCenterPage> {
 
   Widget _buildStatsGrid() {
     final stats = ref.watch(hospitalDashboardStatsProvider);
+    final tr = ref.watch(translationsProvider);
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -440,38 +190,38 @@ class _CommandCenterPageState extends ConsumerState<CommandCenterPage> {
           childAspectRatio: 1.5,
           children: [
             _buildStatCard(
-              title: 'Active Patients',
+              title: tr('hospital_cc_active_patients'),
               value: stats.activePatients.toString(),
               icon: Icons.people_rounded,
               color: AppColors.primary,
-              trend: '+12% from yesterday',
+              trend: tr('hospital_cc_trend_from_yesterday'),
               trendColor: AppColors.success,
             ),
             _buildStatCard(
-              title: 'Bed Occupancy',
+              title: tr('hospital_cc_bed_occupancy'),
               value: '${stats.bedOccupancyRate}%',
-              subvalue: '${stats.occupiedBeds} / ${stats.totalBeds} Occupied',
+              subvalue: '${stats.occupiedBeds} / ${stats.totalBeds} ${tr('hospital_cc_occupied')}',
               icon: Icons.bed_rounded,
               color: AppColors.secondary,
-              trend: '${stats.totalBeds - stats.occupiedBeds} beds available',
+              trend: '${stats.totalBeds - stats.occupiedBeds} ${tr('hospital_cc_beds_available')}',
               trendColor: AppColors.textSecondary,
             ),
             _buildStatCard(
-              title: 'On-Duty Staff',
+              title: tr('hospital_cc_on_duty_staff'),
               value: stats.onDutyStaff.toString(),
-              subvalue: '${stats.onDutyDoctors} Doctors • ${stats.onDutyNurses} Nurses',
+              subvalue: '${stats.onDutyDoctors} ${tr('hospital_cc_doctors')} • ${stats.onDutyNurses} ${tr('hospital_cc_nurses')}',
               icon: Icons.badge_rounded,
               color: const Color(0xFF10B981),
-              trend: 'All shifts covered',
+              trend: tr('hospital_cc_all_shifts_covered'),
               trendColor: AppColors.success,
             ),
             _buildStatCard(
-              title: 'Emergency Intake',
+              title: tr('hospital_cc_emergency_intake'),
               value: stats.emergencyIntake.toString(),
-              subvalue: '${stats.criticalCases} Critical Cases',
+              subvalue: '${stats.criticalCases} ${tr('hospital_cc_critical_cases')}',
               icon: Icons.emergency_rounded,
               color: AppColors.danger,
-              trend: 'Response time: 4m',
+              trend: tr('hospital_cc_response_time'),
               trendColor: AppColors.success,
             ),
           ],
@@ -540,6 +290,7 @@ class _CommandCenterPageState extends ConsumerState<CommandCenterPage> {
 
   Widget _buildDepartmentLoadList() {
     final stats = ref.watch(hospitalDashboardStatsProvider);
+    final tr = ref.watch(translationsProvider);
     final t = AppColors.of(context);
 
     return Container(
@@ -553,7 +304,7 @@ class _CommandCenterPageState extends ConsumerState<CommandCenterPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Department Triage Load',
+            tr('hospital_cc_department_triage_load'),
             style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: t.textPrimary),
           ),
           const SizedBox(height: 16),
@@ -588,7 +339,7 @@ class _CommandCenterPageState extends ConsumerState<CommandCenterPage> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '${dept.patients} patients • ${dept.staff} staff on duty',
+                          '${dept.patients} ${tr('hospital_cc_patients')} • ${dept.staff} ${tr('hospital_cc_staff_on_duty')}',
                           style: GoogleFonts.inter(color: t.textSecondary, fontSize: 12),
                         ),
                       ],
@@ -615,6 +366,7 @@ class _CommandCenterPageState extends ConsumerState<CommandCenterPage> {
   }
 
   Widget _buildLoadChartCard() {
+    final tr = ref.watch(translationsProvider);
     final t = AppColors.of(context);
     return Container(
       padding: const EdgeInsets.all(20),
@@ -627,12 +379,12 @@ class _CommandCenterPageState extends ConsumerState<CommandCenterPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Patient Intake Volume (24 Hours)',
+            tr('hospital_cc_intake_volume_title'),
             style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: t.textPrimary),
           ),
           const SizedBox(height: 8),
           Text(
-            'Displays the hourly patient intake numbers, highlighting peak hours.',
+            tr('hospital_cc_intake_volume_desc'),
             style: GoogleFonts.inter(color: t.textSecondary, fontSize: 13),
           ),
           const SizedBox(height: 24),
@@ -651,9 +403,9 @@ class _CommandCenterPageState extends ConsumerState<CommandCenterPage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _buildLegendItem('Emergency Admissions', t.danger),
+              _buildLegendItem(tr('hospital_cc_legend_emergency'), t.danger),
               const SizedBox(width: 24),
-              _buildLegendItem('OPD Consultations', t.brandPrimary),
+              _buildLegendItem(tr('hospital_cc_legend_opd'), t.brandPrimary),
             ],
           ),
         ],
@@ -684,6 +436,7 @@ class _CommandCenterPageState extends ConsumerState<CommandCenterPage> {
 
   Widget _buildAlertsPanel() {
     final stats = ref.watch(hospitalDashboardStatsProvider);
+    final tr = ref.watch(translationsProvider);
     final t = AppColors.of(context);
 
     return Container(
@@ -701,7 +454,7 @@ class _CommandCenterPageState extends ConsumerState<CommandCenterPage> {
                 Icon(Icons.notifications_active_rounded, color: t.danger.withValues(alpha: 0.8), size: 22),
                 const SizedBox(width: 10),
                 Text(
-                  'Operational Alerts',
+                  tr('hospital_cc_operational_alerts'),
                   style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: t.textPrimary),
                 ),
               ],

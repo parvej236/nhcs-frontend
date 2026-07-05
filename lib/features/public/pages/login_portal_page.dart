@@ -6,9 +6,12 @@ import 'package:dio/dio.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/providers/auth_provider.dart';
 import '../../../core/providers/dio_provider.dart';
-import '../../../core/providers/theme_provider.dart';
+// import '../../../core/providers/theme_provider.dart';
+import '../../../core/providers/language_provider.dart';
+import '../../../core/l10n/app_translations.dart';
 import '../../../core/network/api_endpoints.dart';
 import '../../../core/widgets/app_primitives.dart';
+import '../widgets/public_header.dart' show LanguageSwitcher;
 
 /// The themed authentication portal served at `/login`. Mirrors the prototype
 /// LoginPortal: a "Back to Home" chip, a left brand panel, and a right card
@@ -24,6 +27,7 @@ class LoginPortalPage extends ConsumerStatefulWidget {
 class _LoginPortalPageState extends ConsumerState<LoginPortalPage> {
   bool _isRegister = false;
   bool _isLoading = false;
+  bool _obscurePassword = true;
 
   final _usernameController = TextEditingController(text: 'patient_judge');
   final _emailController = TextEditingController();
@@ -79,7 +83,7 @@ class _LoginPortalPageState extends ConsumerState<LoginPortalPage> {
     if (username.isEmpty ||
         password.isEmpty ||
         (_isRegister && (email.isEmpty || fullName.isEmpty))) {
-      _showError('Please fill out all required fields');
+      _showError(ref.read(translationsProvider)('auth_err_fill_fields'));
       return;
     }
 
@@ -137,8 +141,9 @@ class _LoginPortalPageState extends ConsumerState<LoginPortalPage> {
   @override
   Widget build(BuildContext context) {
     final t = AppColors.of(context);
-    final themeMode = ref.watch(themeModeProvider);
-    final isDark = themeMode == ThemeMode.dark;
+    // final themeMode = ref.watch(themeModeProvider);
+    // final isDark = themeMode == ThemeMode.dark;
+    final tr = ref.watch(translationsProvider);
 
     return Scaffold(
       backgroundColor: t.bgMain,
@@ -154,8 +159,11 @@ class _LoginPortalPageState extends ConsumerState<LoginPortalPage> {
                   // Top bar: Back to Home + theme toggle
                   Row(
                     children: [
-                      _BackToHomeChip(onTap: () => context.go('/')),
+                      _BackToHomeChip(onTap: () => context.go('/'), tr: tr),
                       const Spacer(),
+                      const LanguageSwitcher(),
+                      /*
+                      const SizedBox(width: 12),
                       InkWell(
                         onTap: () =>
                             ref.read(themeModeProvider.notifier).toggle(),
@@ -176,6 +184,7 @@ class _LoginPortalPageState extends ConsumerState<LoginPortalPage> {
                           ),
                         ),
                       ),
+                      */
                     ],
                   ),
                   const SizedBox(height: 40),
@@ -183,15 +192,19 @@ class _LoginPortalPageState extends ConsumerState<LoginPortalPage> {
                   LayoutBuilder(
                     builder: (context, constraints) {
                       final wide = constraints.maxWidth > 860;
-                      final brand = _BrandPanel(t: t);
-                       final card = _AuthCard(
+                      final brand = _BrandPanel(t: t, tr: tr);
+                      final card = _AuthCard(
                         t: t,
+                        tr: tr,
                         isRegister: _isRegister,
                         isLoading: _isLoading,
                         usernameController: _usernameController,
                         emailController: _emailController,
                         passwordController: _passwordController,
                         fullNameController: _fullNameController,
+                        obscurePassword: _obscurePassword,
+                        onToggleObscure: () =>
+                            setState(() => _obscurePassword = !_obscurePassword),
                         onTab: (register) =>
                             setState(() => _isRegister = register),
                         onSubmit: _submit,
@@ -228,7 +241,8 @@ class _LoginPortalPageState extends ConsumerState<LoginPortalPage> {
 
 class _BackToHomeChip extends StatelessWidget {
   final VoidCallback onTap;
-  const _BackToHomeChip({required this.onTap});
+  final AppTranslations tr;
+  const _BackToHomeChip({required this.onTap, required this.tr});
 
   @override
   Widget build(BuildContext context) {
@@ -249,7 +263,7 @@ class _BackToHomeChip extends StatelessWidget {
             Icon(Icons.arrow_back_rounded, size: 16, color: t.textPrimary),
             const SizedBox(width: 8),
             Text(
-              'Back to Home',
+              tr('auth_back_home'),
               style: GoogleFonts.inter(
                 color: t.textPrimary,
                 fontSize: 13,
@@ -265,7 +279,8 @@ class _BackToHomeChip extends StatelessWidget {
 
 class _BrandPanel extends StatelessWidget {
   final AppColorTokens t;
-  const _BrandPanel({required this.t});
+  final AppTranslations tr;
+  const _BrandPanel({required this.t, required this.tr});
 
   @override
   Widget build(BuildContext context) {
@@ -278,7 +293,7 @@ class _BrandPanel extends StatelessWidget {
             Icon(Icons.favorite, color: t.brandPrimary, size: 30),
             const SizedBox(width: 10),
             Text(
-              'NHCS Portal',
+              tr('auth_portal_title'),
               style: GoogleFonts.outfit(
                 color: t.brandPrimary,
                 fontSize: 26,
@@ -289,7 +304,7 @@ class _BrandPanel extends StatelessWidget {
         ),
         const SizedBox(height: 22),
         Text(
-          'Access Your Centralized Health Registries',
+          tr('auth_brand_heading'),
           style: GoogleFonts.outfit(
             color: t.textPrimary,
             fontSize: 36,
@@ -299,9 +314,7 @@ class _BrandPanel extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         Text(
-          'Log in to manage appointments, issue clinical prescriptions, '
-          'provide laboratory evaluations, and view electronic health vault '
-          'registries.',
+          tr('auth_brand_subtitle'),
           style: GoogleFonts.inter(
             color: t.textSecondary,
             fontSize: 15,
@@ -312,13 +325,13 @@ class _BrandPanel extends StatelessWidget {
         _BrandBullet(
           t: t,
           icon: Icons.favorite_border,
-          text: 'Secure health vault records',
+          text: tr('auth_bullet_vault'),
         ),
         const SizedBox(height: 14),
         _BrandBullet(
           t: t,
           icon: Icons.monitor_heart_outlined,
-          text: 'Live clinical analytics sync for patients and doctors',
+          text: tr('auth_bullet_analytics'),
         ),
       ],
     );
@@ -350,23 +363,29 @@ class _BrandBullet extends StatelessWidget {
 
 class _AuthCard extends StatelessWidget {
   final AppColorTokens t;
+  final AppTranslations tr;
   final bool isRegister;
   final bool isLoading;
   final TextEditingController usernameController;
   final TextEditingController emailController;
   final TextEditingController passwordController;
   final TextEditingController fullNameController;
+  final bool obscurePassword;
+  final VoidCallback onToggleObscure;
   final ValueChanged<bool> onTab;
   final VoidCallback onSubmit;
 
   const _AuthCard({
     required this.t,
+    required this.tr,
     required this.isRegister,
     required this.isLoading,
     required this.usernameController,
     required this.emailController,
     required this.passwordController,
     required this.fullNameController,
+    required this.obscurePassword,
+    required this.onToggleObscure,
     required this.onTab,
     required this.onSubmit,
   });
@@ -389,14 +408,14 @@ class _AuthCard extends StatelessWidget {
               children: [
                 _Tab(
                   t: t,
-                  label: 'Sign In',
+                  label: tr('auth_tab_signin'),
                   active: !isRegister,
                   onTap: () => onTab(false),
                 ),
                 const SizedBox(width: 20),
                 _Tab(
                   t: t,
-                  label: 'Register',
+                  label: tr('auth_tab_register'),
                   active: isRegister,
                   onTap: () => onTab(true),
                 ),
@@ -406,38 +425,48 @@ class _AuthCard extends StatelessWidget {
           const SizedBox(height: 22),
           if (isRegister) ...[
             AppInput(
-              label: 'Full Name',
+              label: tr('auth_field_full_name'),
               hint: 'Nehal Ahmmed',
               controller: fullNameController,
             ),
             const SizedBox(height: 16),
             AppInput(
-              label: 'Email Address',
+              label: tr('auth_field_email'),
               hint: 'nehal@gmail.com',
               controller: emailController,
               keyboardType: TextInputType.emailAddress,
             ),
             const SizedBox(height: 16),
             AppInput(
-              label: 'Username',
-              hint: 'Choose username',
+              label: tr('auth_field_username'),
+              hint: tr('auth_hint_choose_username'),
               controller: usernameController,
             ),
             const SizedBox(height: 16),
             AppInput(
-              label: 'Password',
-              hint: 'Create password',
+              label: tr('auth_field_password'),
+              hint: tr('auth_hint_create_password'),
               controller: passwordController,
-              obscureText: true,
+              obscureText: obscurePassword,
+              suffix: IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                icon: Icon(
+                  obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                  color: t.textSecondary,
+                  size: 20,
+                ),
+                onPressed: onToggleObscure,
+              ),
             ),
           ] else ...[
             AppInput(
-              label: 'Username',
-              hint: 'e.g. patient',
+              label: tr('auth_field_username'),
+              hint: tr('auth_hint_username_example'),
               controller: usernameController,
               suffix: PopupMenuButton<String>(
                 icon: Icon(Icons.arrow_drop_down_rounded, color: t.textSecondary),
-                tooltip: 'Select Demo User',
+                tooltip: tr('auth_select_demo_user'),
                 onSelected: (val) {
                   usernameController.text = val;
                   passwordController.text = 'password123';
@@ -462,19 +491,29 @@ class _AuthCard extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             AppInput(
-              label: 'Password',
+              label: tr('auth_field_password'),
               hint: '••••••••',
               controller: passwordController,
-              obscureText: true,
+              obscureText: obscurePassword,
+              suffix: IconButton(
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                icon: Icon(
+                  obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                  color: t.textSecondary,
+                  size: 20,
+                ),
+                onPressed: onToggleObscure,
+              ),
             ),
           ],
           const SizedBox(height: 22),
           AppButton(
             label: isLoading
-                ? (isRegister ? 'Registering…' : 'Signing In…')
+                ? (isRegister ? tr('auth_btn_registering') : tr('auth_btn_signing_in'))
                 : (isRegister
-                    ? 'Register Health Profile'
-                    : 'Sign In to Portal'),
+                    ? tr('auth_btn_register')
+                    : tr('auth_btn_signin')),
             expand: true,
             onPressed: isLoading ? null : onSubmit,
           ),

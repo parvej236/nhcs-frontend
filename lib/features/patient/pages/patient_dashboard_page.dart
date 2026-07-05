@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/l10n/app_translations.dart';
+import '../../../core/providers/language_provider.dart';
 import '../../../core/widgets/ai_insight_panel.dart';
 import '../../../core/widgets/notification_dropdown.dart';
 import '../../../core/providers/notifications_provider.dart';
@@ -10,6 +12,8 @@ import '../data/models/dashboard_summary.dart';
 import '../data/models/medical_record.dart';
 import '../data/models/patient_profile.dart';
 import '../presentation/providers/patient_providers.dart';
+import 'patient_dashboard_skeleton.dart';
+import '../../../core/widgets/shimmer.dart';
 
 class PatientDashboardPage extends ConsumerWidget {
   const PatientDashboardPage({super.key});
@@ -22,18 +26,19 @@ class PatientDashboardPage extends ConsumerWidget {
     final prescriptionsState = ref.watch(patientPrescriptionsProvider);
     final labReportsState = ref.watch(patientLabReportsProvider);
     final t = AppColors.of(context);
+    final tr = ref.watch(translationsProvider);
 
     return Scaffold(
       backgroundColor: t.bgMain,
       body: profileState.when(
-        loading: () => Center(child: CircularProgressIndicator(color: t.brandPrimary)),
+        loading: () => const PatientDashboardSkeleton(),
         error: (err, stack) => Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(Icons.error_outline_rounded, color: t.danger, size: 48),
               const SizedBox(height: 16),
-              Text('Error loading dashboard: $err', style: GoogleFonts.inter(color: t.textPrimary)),
+              Text('${tr('patient_err_loading_dashboard')}: $err', style: GoogleFonts.inter(color: t.textPrimary)),
               const SizedBox(height: 12),
               ElevatedButton(
                 onPressed: () {
@@ -44,7 +49,7 @@ class PatientDashboardPage extends ConsumerWidget {
                   ref.invalidate(patientPrescriptionsProvider);
                   ref.invalidate(patientLabReportsProvider);
                 },
-                child: const Text('Retry'),
+                child: Text(tr('patient_retry')),
               ),
             ],
           ),
@@ -56,23 +61,23 @@ class PatientDashboardPage extends ConsumerWidget {
               Expanded(
                 child: Column(
                   children: [
-                    _buildHeader(context, ref),
+                    _buildHeader(context, ref, tr),
                     Expanded(
                       child: SingleChildScrollView(
                         padding: const EdgeInsets.all(24),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _buildHealthCard(context, profile),
+                            _buildHealthCard(context, profile, tr),
                             const SizedBox(height: 24),
                             aiSummaryState.when(
                               loading: () => LinearProgressIndicator(color: t.warning),
                               error: (e, s) => const SizedBox.shrink(),
-                              data: (aiSummary) => _buildAISummary(aiSummary),
+                              data: (aiSummary) => _buildAISummary(aiSummary, tr),
                             ),
                             const SizedBox(height: 24),
                             Text(
-                              'Quick Services',
+                              tr('patient_quick_services'),
                               style: GoogleFonts.outfit(
                                 fontSize: 20,
                                 fontWeight: FontWeight.w600,
@@ -80,9 +85,9 @@ class PatientDashboardPage extends ConsumerWidget {
                               ),
                             ),
                             const SizedBox(height: 16),
-                            _buildQuickActions(context, ref),
+                            _buildQuickActions(context, ref, tr),
                             const SizedBox(height: 24),
-                            _buildSectionRow(context, prescriptionsState, appointmentsState),
+                            _buildSectionRow(context, prescriptionsState, appointmentsState, tr),
                           ],
                         ),
                       ),
@@ -91,7 +96,7 @@ class PatientDashboardPage extends ConsumerWidget {
                 ),
               ),
               // Right panel
-              _buildRightPanel(context, ref, profile, labReportsState),
+              _buildRightPanel(context, ref, profile, labReportsState, tr),
             ],
           );
         },
@@ -99,7 +104,7 @@ class PatientDashboardPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildHeader(BuildContext context, WidgetRef ref) {
+  Widget _buildHeader(BuildContext context, WidgetRef ref, AppTranslations tr) {
     final t = AppColors.of(context);
     final notifications = ref.watch(patientNotificationsProvider);
 
@@ -127,7 +132,7 @@ class PatientDashboardPage extends ConsumerWidget {
                     child: TextField(
                       style: GoogleFonts.inter(color: t.textPrimary, fontSize: 14),
                       decoration: InputDecoration(
-                        hintText: 'Search records, doctors, appointments...',
+                        hintText: tr('patient_search_placeholder'),
                         hintStyle: GoogleFonts.inter(color: t.textSecondary, fontSize: 14),
                         border: InputBorder.none,
                         enabledBorder: InputBorder.none,
@@ -142,6 +147,23 @@ class PatientDashboardPage extends ConsumerWidget {
             ),
           ),
           const SizedBox(width: 16),
+          IconButton(
+            icon: Icon(Icons.refresh_rounded, color: t.brandPrimary),
+            tooltip: tr('patient_reload'),
+            onPressed: () {
+              ref.invalidate(patientProfileProvider);
+              ref.invalidate(patientAiHealthSummaryProvider);
+              ref.invalidate(patientAppointmentsProvider);
+              ref.invalidate(patientPrescriptionsProvider);
+              ref.invalidate(patientLabReportsProvider);
+              ref.invalidate(patientNotificationsProvider);
+              ref.invalidate(bloodDonationProvider);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(tr('patient_reloaded')), duration: const Duration(seconds: 1)),
+              );
+            },
+          ),
+          const SizedBox(width: 8),
           NotificationDropdown(
             notifications: notifications,
             onMarkRead: (id) => ref.read(patientNotificationsProvider.notifier).markAsRead(id),
@@ -183,14 +205,14 @@ class PatientDashboardPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildHealthCard(BuildContext context, PatientProfile profile) {
+  Widget _buildHealthCard(BuildContext context, PatientProfile profile, AppTranslations tr) {
     final t = AppColors.of(context);
     final age = DateTime.now().year - profile.dateOfBirth.year;
-    final allergiesStr = profile.allergies.isEmpty 
-        ? 'None' 
+    final allergiesStr = profile.allergies.isEmpty
+        ? tr('patient_none')
         : profile.allergies.map((e) => e.allergen).join(', ');
-    final chronicStr = profile.chronicDiseases.isEmpty 
-        ? 'None' 
+    final chronicStr = profile.chronicDiseases.isEmpty
+        ? tr('patient_none')
         : profile.chronicDiseases.map((e) => e.diseaseName).join(', ');
 
     return Container(
@@ -213,7 +235,7 @@ class PatientDashboardPage extends ConsumerWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'NHCS Digital Health Card',
+                tr('patient_digital_health_card'),
                 style: GoogleFonts.inter(color: Colors.white.withValues(alpha: 0.7), fontSize: 12, fontWeight: FontWeight.w500, letterSpacing: 1),
               ),
               Container(
@@ -262,13 +284,13 @@ class PatientDashboardPage extends ConsumerWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _cardStat('Blood Group', profile.bloodGroup),
+                _cardStat(tr('patient_blood_group'), profile.bloodGroup),
                 _cardStatDivider(),
-                _cardStat('Age', age.toString()),
+                _cardStat(tr('patient_age'), age.toString()),
                 _cardStatDivider(),
-                _cardStat('Allergies', allergiesStr),
+                _cardStat(tr('patient_allergies'), allergiesStr),
                 _cardStatDivider(),
-                _cardStat('Chronic', chronicStr),
+                _cardStat(tr('patient_chronic'), chronicStr),
               ],
             ),
           ),
@@ -298,27 +320,27 @@ class PatientDashboardPage extends ConsumerWidget {
     return Container(width: 1, height: 30, color: Colors.white.withValues(alpha: 0.15));
   }
 
-  Widget _buildAISummary(AiHealthSummary summary) {
+  Widget _buildAISummary(AiHealthSummary summary, AppTranslations tr) {
     return AiInsightPanel(
-      title: 'AI Health Assessment & Vitals Briefing',
+      title: tr('patient_ai_health_assessment'),
       description: summary.summaryText,
       type: 'warning',
-      recommendations: const [
-        'Vitals are stable, keep monitoring BP daily.',
-        'Take prescribed Metformin 500mg as instructed by Dr. Ahmed Khan.',
-        'Avoid high sodium meals and keep well hydrated.'
+      recommendations: [
+        tr('patient_ai_rec_1'),
+        tr('patient_ai_rec_2'),
+        tr('patient_ai_rec_3'),
       ],
     );
   }
 
-  Widget _buildQuickActions(BuildContext context, WidgetRef ref) {
+  Widget _buildQuickActions(BuildContext context, WidgetRef ref, AppTranslations tr) {
     final t = AppColors.of(context);
     return Row(
       children: [
         _actionCard(
           context,
           Icons.calendar_month_rounded,
-          'Book Appointment',
+          tr('patient_action_book_appointment'),
           t.brandPrimary,
           onTap: () => ref.read(patientNavigationProvider.notifier).state = 2,
         ),
@@ -326,7 +348,7 @@ class PatientDashboardPage extends ConsumerWidget {
         _actionCard(
           context,
           Icons.timeline_rounded,
-          'Health Timeline',
+          tr('patient_health_timeline'),
           t.brandSecondary,
           onTap: () => ref.read(patientNavigationProvider.notifier).state = 1,
         ),
@@ -334,7 +356,7 @@ class PatientDashboardPage extends ConsumerWidget {
         _actionCard(
           context,
           Icons.folder_shared_rounded,
-          'Medical Vault',
+          tr('patient_medical_vault'),
           t.warning,
           onTap: () => ref.read(patientNavigationProvider.notifier).state = 3,
         ),
@@ -342,7 +364,7 @@ class PatientDashboardPage extends ConsumerWidget {
         _actionCard(
           context,
           Icons.auto_awesome_rounded,
-          'Healthcare AI',
+          tr('patient_healthcare_ai'),
           t.success,
           onTap: () => ref.read(patientNavigationProvider.notifier).state = 5,
         ),
@@ -390,6 +412,7 @@ class PatientDashboardPage extends ConsumerWidget {
     BuildContext context,
     AsyncValue<List<Prescription>> prescriptionsState,
     AsyncValue<List<Appointment>> appointmentsState,
+    AppTranslations tr,
   ) {
     final t = AppColors.of(context);
     return Row(
@@ -401,20 +424,55 @@ class PatientDashboardPage extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Active Prescriptions',
+                tr('patient_active_prescriptions'),
                 style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w600, color: t.textPrimary),
               ),
               const SizedBox(height: 16),
               prescriptionsState.when(
-                loading: () => Center(child: CircularProgressIndicator(color: t.success)),
-                error: (err, stack) => Text('Error loading prescriptions: $err', style: TextStyle(color: t.textSecondary)),
+                loading: () => Shimmer(
+                  child: Column(
+                    children: [
+                      for (int i = 0; i < 2; i++)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: Container(
+                            height: 70,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: t.bgCard,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: t.border),
+                            ),
+                            child: Row(
+                              children: [
+                                const ShimmerBox(width: 32, height: 32, borderRadius: BorderRadius.all(Radius.circular(8))),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: const [
+                                      ShimmerBox(width: 100, height: 14),
+                                      SizedBox(height: 6),
+                                      ShimmerBox(width: 160, height: 10),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                error: (err, stack) => Text('${tr('patient_err_loading_prescriptions')}: $err', style: TextStyle(color: t.textSecondary)),
                 data: (prescriptions) {
                   if (prescriptions.isEmpty) {
-                    return Text('No active prescriptions', style: GoogleFonts.inter(color: t.textSecondary));
+                    return Text(tr('patient_no_active_prescriptions'), style: GoogleFonts.inter(color: t.textSecondary));
                   }
                   final activeMeds = prescriptions.expand((p) => p.medicines).take(3).toList();
                   if (activeMeds.isEmpty) {
-                    return Text('No active medications', style: GoogleFonts.inter(color: t.textSecondary));
+                    return Text(tr('patient_no_active_medications'), style: GoogleFonts.inter(color: t.textSecondary));
                   }
                   return ListView.separated(
                     shrinkWrap: true,
@@ -423,7 +481,7 @@ class PatientDashboardPage extends ConsumerWidget {
                     separatorBuilder: (context, index) => const SizedBox(height: 12),
                     itemBuilder: (context, index) {
                       final med = activeMeds[index];
-                      return _prescriptionCard(context, med.name, med.instruction, med.duration, t.success);
+                      return _prescriptionCard(context, med.name, med.instruction, med.duration, t.success, tr);
                     },
                   );
                 },
@@ -438,17 +496,52 @@ class PatientDashboardPage extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Upcoming Appointments',
+                tr('patient_upcoming_appointments'),
                 style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w600, color: t.textPrimary),
               ),
               const SizedBox(height: 16),
               appointmentsState.when(
-                loading: () => Center(child: CircularProgressIndicator(color: t.brandPrimary)),
-                error: (err, stack) => Text('Error loading appointments: $err', style: TextStyle(color: t.textSecondary)),
+                loading: () => Shimmer(
+                  child: Column(
+                    children: [
+                      for (int i = 0; i < 2; i++)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: Container(
+                            height: 70,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: t.bgCard,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: t.border),
+                            ),
+                            child: Row(
+                              children: [
+                                const ShimmerBox(width: 32, height: 32, borderRadius: BorderRadius.all(Radius.circular(8))),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: const [
+                                      ShimmerBox(width: 120, height: 14),
+                                      SizedBox(height: 6),
+                                      ShimmerBox(width: 140, height: 10),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                error: (err, stack) => Text('${tr('patient_err_loading_appointments')}: $err', style: TextStyle(color: t.textSecondary)),
                 data: (appointments) {
                   final upcoming = appointments.where((a) => a.status == 'Upcoming').toList();
                   if (upcoming.isEmpty) {
-                    return Text('No upcoming appointments', style: GoogleFonts.inter(color: t.textSecondary));
+                    return Text(tr('patient_no_upcoming_appointments'), style: GoogleFonts.inter(color: t.textSecondary));
                   }
                   return ListView.separated(
                     shrinkWrap: true,
@@ -470,7 +563,7 @@ class PatientDashboardPage extends ConsumerWidget {
     );
   }
 
-  Widget _prescriptionCard(BuildContext context, String medicine, String instruction, String duration, Color color) {
+  Widget _prescriptionCard(BuildContext context, String medicine, String instruction, String duration, Color color, AppTranslations tr) {
     final t = AppColors.of(context);
     return Container(
       padding: const EdgeInsets.all(16),
@@ -495,7 +588,7 @@ class PatientDashboardPage extends ConsumerWidget {
                 const SizedBox(height: 2),
                 Text(instruction, style: GoogleFonts.inter(color: t.textSecondary, fontSize: 12)),
                 const SizedBox(height: 2),
-                Text('Duration: $duration', style: GoogleFonts.inter(color: t.textSecondary.withValues(alpha: 0.7), fontSize: 11)),
+                Text('${tr('patient_duration')}: $duration', style: GoogleFonts.inter(color: t.textSecondary.withValues(alpha: 0.7), fontSize: 11)),
               ],
             ),
           ),
@@ -556,7 +649,7 @@ class PatientDashboardPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildRightPanel(BuildContext context, WidgetRef ref, PatientProfile profile, AsyncValue<List<LabReport>> labReportsState) {
+  Widget _buildRightPanel(BuildContext context, WidgetRef ref, PatientProfile profile, AsyncValue<List<LabReport>> labReportsState, AppTranslations tr) {
     final t = AppColors.of(context);
     return Container(
       width: 300,
@@ -594,30 +687,65 @@ class PatientDashboardPage extends ConsumerWidget {
             ),
             const SizedBox(height: 20),
             // Vitals
-            Text('Health Vitals', style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w600, color: t.textPrimary)),
+            Text(tr('patient_health_vitals'), style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w600, color: t.textPrimary)),
             const SizedBox(height: 12),
-            _vitalCard(context, 'Blood Pressure', '${profile.vitals.bpSystolic}/${profile.vitals.bpDiastolic} mmHg', Icons.favorite_rounded, t.brandPrimary),
+            _vitalCard(context, tr('patient_blood_pressure'), '${profile.vitals.bpSystolic}/${profile.vitals.bpDiastolic} mmHg', Icons.favorite_rounded, t.brandPrimary),
             const SizedBox(height: 8),
-            _vitalCard(context, 'Blood Glucose', '${profile.vitals.bloodGlucose} mg/dL', Icons.bloodtype_rounded, t.warning),
+            _vitalCard(context, tr('patient_blood_glucose'), '${profile.vitals.bloodGlucose} mg/dL', Icons.bloodtype_rounded, t.warning),
             const SizedBox(height: 8),
-            _vitalCard(context, 'Heart Rate', '${profile.vitals.heartRate} bpm', Icons.monitor_heart_rounded, t.success),
+            _vitalCard(context, tr('patient_heart_rate'), '${profile.vitals.heartRate} bpm', Icons.monitor_heart_rounded, t.success),
             const SizedBox(height: 8),
-            _vitalCard(context, 'Weight', '${profile.vitals.weight} kg', Icons.scale_rounded, t.brandSecondary),
+            _vitalCard(context, tr('patient_weight'), '${profile.vitals.weight} kg', Icons.scale_rounded, t.brandSecondary),
             const SizedBox(height: 24),
-            
+
             // Blood Donation Portal Quick View
-            _buildBloodDonationRightCard(context, ref),
+            _buildBloodDonationRightCard(context, ref, tr),
             const SizedBox(height: 24),
 
             // Recent reports
-            Text('Recent Test Reports', style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w600, color: t.textPrimary)),
+            Text(tr('patient_recent_test_reports'), style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w600, color: t.textPrimary)),
             const SizedBox(height: 12),
             labReportsState.when(
-              loading: () => Center(child: CircularProgressIndicator(color: t.brandPrimary)),
-              error: (err, stack) => Text('Error loading reports', style: TextStyle(color: t.textSecondary)),
+              loading: () => Shimmer(
+                child: Column(
+                  children: [
+                    for (int i = 0; i < 2; i++)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Container(
+                          height: 60,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: t.bgCard,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: t.border),
+                          ),
+                          child: Row(
+                            children: [
+                              const ShimmerBox(width: 24, height: 24, borderRadius: BorderRadius.all(Radius.circular(6))),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: const [
+                                    ShimmerBox(width: 110, height: 12),
+                                    SizedBox(height: 4),
+                                    ShimmerBox(width: 130, height: 8),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              error: (err, stack) => Text(tr('patient_err_loading_reports'), style: TextStyle(color: t.textSecondary)),
               data: (reports) {
                 if (reports.isEmpty) {
-                  return Text('No test reports yet', style: GoogleFonts.inter(color: t.textSecondary));
+                  return Text(tr('patient_no_test_reports'), style: GoogleFonts.inter(color: t.textSecondary));
                 }
                 return ListView.builder(
                   shrinkWrap: true,
@@ -637,15 +765,39 @@ class PatientDashboardPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildBloodDonationRightCard(BuildContext context, WidgetRef ref) {
+  Widget _buildBloodDonationRightCard(BuildContext context, WidgetRef ref, AppTranslations tr) {
     final t = AppColors.of(context);
     final donationState = ref.watch(bloodDonationProvider);
 
     return donationState.when(
-      loading: () => Container(
-        height: 80,
-        alignment: Alignment.center,
-        child: CircularProgressIndicator(color: t.brandPrimary, strokeWidth: 2),
+      loading: () => Shimmer(
+        child: Container(
+          height: 80,
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: t.bgCard,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: t.border),
+          ),
+          child: Row(
+            children: [
+              const ShimmerBox(width: 24, height: 24, borderRadius: BorderRadius.all(Radius.circular(6))),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: const [
+                    ShimmerBox(width: 130, height: 12),
+                    SizedBox(height: 6),
+                    ShimmerBox(width: 90, height: 8),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
       error: (_, __) => const SizedBox.shrink(),
       data: (data) {
@@ -681,7 +833,7 @@ class PatientDashboardPage extends ConsumerWidget {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    'Blood Donation Portal',
+                    tr('patient_blood_donation_portal'),
                     style: GoogleFonts.outfit(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
@@ -695,7 +847,7 @@ class PatientDashboardPage extends ConsumerWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Donor Registration:',
+                    tr('patient_donor_registration'),
                     style: GoogleFonts.inter(fontSize: 12, color: t.textSecondary),
                   ),
                   Container(
@@ -705,7 +857,7 @@ class PatientDashboardPage extends ConsumerWidget {
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      active ? 'Registered' : 'Inactive',
+                      active ? tr('patient_registered') : tr('patient_inactive'),
                       style: GoogleFonts.inter(
                         color: active ? t.success : t.textSecondary,
                         fontSize: 10,
@@ -721,7 +873,7 @@ class PatientDashboardPage extends ConsumerWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'Matched Requests:',
+                      tr('patient_matched_requests'),
                       style: GoogleFonts.inter(fontSize: 12, color: t.textSecondary),
                     ),
                     Container(
@@ -747,10 +899,8 @@ class PatientDashboardPage extends ConsumerWidget {
                 width: double.infinity,
                 child: TextButton(
                   onPressed: () {
-                    // Update navigation selection to My Profile (4)
-                    ref.read(patientNavigationProvider.notifier).state = 4;
-                    // Update profile tab selector to Blood Donation (1)
-                    ref.read(patientProfileTabProvider.notifier).state = 1;
+                    // Update navigation selection to Blood Donation (6)
+                    ref.read(patientNavigationProvider.notifier).state = 6;
                   },
                   style: TextButton.styleFrom(
                     backgroundColor: active ? t.danger.withValues(alpha: 0.1) : t.bgInput,
@@ -758,7 +908,7 @@ class PatientDashboardPage extends ConsumerWidget {
                     padding: const EdgeInsets.symmetric(vertical: 8),
                   ),
                   child: Text(
-                    'Manage Portal',
+                    tr('patient_manage_portal'),
                     style: GoogleFonts.inter(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,

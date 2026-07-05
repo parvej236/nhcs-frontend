@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/l10n/app_translations.dart';
+import '../../../core/providers/language_provider.dart';
 import '../../../core/widgets/app_primitives.dart';
 import '../data/models/medical_record.dart';
 import '../presentation/providers/patient_providers.dart';
+import '../../../core/widgets/pdf_view_dialog.dart';
 
 class MedicalVaultPage extends ConsumerWidget {
   const MedicalVaultPage({super.key});
@@ -14,7 +17,9 @@ class MedicalVaultPage extends ConsumerWidget {
     final prescriptionsState = ref.watch(patientPrescriptionsProvider);
     final labReportsState = ref.watch(patientLabReportsProvider);
     final imagingState = ref.watch(patientImagingReportsProvider);
+
     final t = AppColors.of(context);
+    final tr = ref.watch(translationsProvider);
 
     return DefaultTabController(
       length: 3,
@@ -31,13 +36,30 @@ class MedicalVaultPage extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Medical Vault',
-                    style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold, color: t.textPrimary),
+                  Row(
+                    children: [
+                      Text(
+                        tr('patient_medical_vault'),
+                        style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold, color: t.textPrimary),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        icon: Icon(Icons.refresh_rounded, color: t.brandPrimary),
+                        tooltip: tr('patient_reload'),
+                        onPressed: () {
+                          ref.invalidate(patientPrescriptionsProvider);
+                          ref.invalidate(patientLabReportsProvider);
+                          ref.invalidate(patientImagingReportsProvider);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(tr('patient_reloaded')), duration: const Duration(seconds: 1)),
+                          );
+                        },
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'All your medical records in one secure place',
+                    tr('patient_vault_subtitle'),
                     style: GoogleFonts.inter(color: t.textSecondary, fontSize: 14),
                   ),
                   const SizedBox(height: 20),
@@ -47,10 +69,10 @@ class MedicalVaultPage extends ConsumerWidget {
                     indicatorColor: t.brandPrimary,
                     labelStyle: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14),
                     unselectedLabelStyle: GoogleFonts.inter(fontWeight: FontWeight.w400, fontSize: 14),
-                    tabs: const [
-                      Tab(text: 'Prescriptions'),
-                      Tab(text: 'Lab Reports'),
-                      Tab(text: 'Imaging'),
+                    tabs: [
+                      Tab(text: tr('patient_tab_prescriptions')),
+                      Tab(text: tr('patient_tab_lab_reports')),
+                      Tab(text: tr('patient_tab_imaging')),
                     ],
                   ),
                 ],
@@ -59,9 +81,9 @@ class MedicalVaultPage extends ConsumerWidget {
             Expanded(
               child: TabBarView(
                 children: [
-                  _buildPrescriptionsTab(context, prescriptionsState),
-                  _buildLabReportsTab(context, labReportsState),
-                  _buildImagingTab(context, imagingState),
+                  _buildPrescriptionsTab(context, prescriptionsState, tr),
+                  _buildLabReportsTab(context, labReportsState, tr),
+                  _buildImagingTab(context, imagingState, tr),
                 ],
               ),
             ),
@@ -71,17 +93,17 @@ class MedicalVaultPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildPrescriptionsTab(BuildContext context, AsyncValue<List<Prescription>> state) {
+  Widget _buildPrescriptionsTab(BuildContext context, AsyncValue<List<Prescription>> state, AppTranslations tr) {
     final t = AppColors.of(context);
     return state.when(
       loading: () => Center(child: CircularProgressIndicator(color: t.brandPrimary)),
       error: (err, stack) => Center(
-        child: Text('Error loading prescriptions: $err', style: TextStyle(color: t.textSecondary)),
+        child: Text('${tr('patient_err_loading_prescriptions')}: $err', style: TextStyle(color: t.textSecondary)),
       ),
       data: (prescriptions) {
         if (prescriptions.isEmpty) {
           return Center(
-            child: Text('No prescriptions found.', style: GoogleFonts.inter(color: t.textSecondary)),
+            child: Text(tr('patient_no_prescriptions_found'), style: GoogleFonts.inter(color: t.textSecondary)),
           );
         }
         return ListView.separated(
@@ -91,16 +113,16 @@ class MedicalVaultPage extends ConsumerWidget {
           itemBuilder: (context, index) {
             final prescription = prescriptions[index];
             final dateStr = "${prescription.date.day}/${prescription.date.month}/${prescription.date.year}";
-            return _buildPrescriptionCard(context, prescription, dateStr);
+            return _buildPrescriptionCard(context, prescription, dateStr, tr);
           },
         );
       },
     );
   }
 
-  Widget _buildPrescriptionCard(BuildContext context, Prescription p, String dateStr) {
+  Widget _buildPrescriptionCard(BuildContext context, Prescription p, String dateStr, AppTranslations tr) {
     final t = AppColors.of(context);
-    final followUpText = p.followUpDate != null ? 'Follow-up: ${p.followUpDate}' : 'No follow-up scheduled';
+    final followUpText = p.followUpDate != null ? '${tr('patient_follow_up')}: ${p.followUpDate}' : tr('patient_no_follow_up');
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -168,7 +190,7 @@ class MedicalVaultPage extends ConsumerWidget {
               ),
               const Spacer(),
               AppButton(
-                label: 'View details',
+                label: tr('patient_view_details'),
                 icon: Icons.visibility_rounded,
                 variant: AppButtonVariant.outline,
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -182,17 +204,21 @@ class MedicalVaultPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildLabReportsTab(BuildContext context, AsyncValue<List<LabReport>> state) {
+  Widget _buildLabReportsTab(
+    BuildContext context,
+    AsyncValue<List<LabReport>> state,
+    AppTranslations tr,
+  ) {
     final t = AppColors.of(context);
     return state.when(
       loading: () => Center(child: CircularProgressIndicator(color: t.brandPrimary)),
       error: (err, stack) => Center(
-        child: Text('Error loading lab reports: $err', style: TextStyle(color: t.textSecondary)),
+        child: Text('${tr('patient_err_loading_lab_reports')}: $err', style: TextStyle(color: t.textSecondary)),
       ),
       data: (reports) {
         if (reports.isEmpty) {
           return Center(
-            child: Text('No lab reports found.', style: GoogleFonts.inter(color: t.textSecondary)),
+            child: Text(tr('patient_no_lab_reports_found'), style: GoogleFonts.inter(color: t.textSecondary)),
           );
         }
         return ListView.separated(
@@ -202,14 +228,14 @@ class MedicalVaultPage extends ConsumerWidget {
           itemBuilder: (context, index) {
             final report = reports[index];
             final dateStr = "${report.date.day}/${report.date.month}/${report.date.year}";
-            return _buildLabReportCard(context, report, dateStr);
+            return _buildLabReportCard(context, report, dateStr, tr);
           },
         );
       },
     );
   }
 
-  Widget _buildLabReportCard(BuildContext context, LabReport report, String dateStr) {
+  Widget _buildLabReportCard(BuildContext context, LabReport report, String dateStr, AppTranslations tr) {
     final t = AppColors.of(context);
     final statusColor = report.status == 'Published' ? t.success : t.warning;
     return Container(
@@ -239,7 +265,7 @@ class MedicalVaultPage extends ConsumerWidget {
                   style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14, color: t.textPrimary),
                 ),
                 Text(
-                  'Category: ${report.category} • $dateStr',
+                  '${tr('patient_category')}: ${report.category} • $dateStr',
                   style: GoogleFonts.inter(color: t.textSecondary, fontSize: 12),
                 ),
               ],
@@ -265,17 +291,17 @@ class MedicalVaultPage extends ConsumerWidget {
     );
   }
 
-  Widget _buildImagingTab(BuildContext context, AsyncValue<List<ImagingReport>> state) {
+  Widget _buildImagingTab(BuildContext context, AsyncValue<List<ImagingReport>> state, AppTranslations tr) {
     final t = AppColors.of(context);
     return state.when(
       loading: () => Center(child: CircularProgressIndicator(color: t.brandPrimary)),
       error: (err, stack) => Center(
-        child: Text('Error loading imaging reports: $err', style: TextStyle(color: t.textSecondary)),
+        child: Text('${tr('patient_err_loading_imaging')}: $err', style: TextStyle(color: t.textSecondary)),
       ),
       data: (reports) {
         if (reports.isEmpty) {
           return Center(
-            child: Text('No imaging reports found.', style: GoogleFonts.inter(color: t.textSecondary)),
+            child: Text(tr('patient_no_imaging_found'), style: GoogleFonts.inter(color: t.textSecondary)),
           );
         }
         return ListView.separated(
@@ -285,14 +311,14 @@ class MedicalVaultPage extends ConsumerWidget {
           itemBuilder: (context, index) {
             final report = reports[index];
             final dateStr = "${report.date.day}/${report.date.month}/${report.date.year}";
-            return _buildImagingReportCard(context, report, dateStr);
+            return _buildImagingReportCard(context, report, dateStr, tr);
           },
         );
       },
     );
   }
 
-  Widget _buildImagingReportCard(BuildContext context, ImagingReport report, String dateStr) {
+  Widget _buildImagingReportCard(BuildContext context, ImagingReport report, String dateStr, AppTranslations tr) {
     final t = AppColors.of(context);
     final iconData = report.type.contains('X-Ray') ? Icons.image_outlined : Icons.monitor_heart_rounded;
     return Container(
@@ -329,14 +355,14 @@ class MedicalVaultPage extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(color: t.success.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(6)),
             child: Text(
-              'Reported',
+              tr('patient_reported'),
               style: GoogleFonts.inter(color: t.success, fontSize: 11, fontWeight: FontWeight.w600),
             ),
           ),
           const SizedBox(width: 8),
           IconButton(
             icon: Icon(Icons.visibility_rounded, size: 18, color: t.brandPrimary),
-            onPressed: () => _viewImagingReportDetails(context, report),
+            onPressed: () => _viewImagingReportDetails(context, report, tr),
           ),
         ],
       ),
@@ -344,344 +370,26 @@ class MedicalVaultPage extends ConsumerWidget {
   }
 
   void _viewPrescriptionDetails(BuildContext context, Prescription p) {
-    final t = AppColors.of(context);
     showDialog(
       context: context,
-      builder: (context) => Dialog(
-        backgroundColor: t.bgCard,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: BorderSide(color: t.border),
-        ),
-        child: Container(
-          width: 650,
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Prescription Details',
-                    style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: t.textPrimary),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: Icon(Icons.close_rounded, color: t.textSecondary),
-                  ),
-                ],
-              ),
-              Divider(color: t.border),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        p.doctorName,
-                        style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16, color: t.brandPrimary),
-                      ),
-                      Text(p.doctorSpecialization, style: GoogleFonts.inter(color: t.textSecondary, fontSize: 13)),
-                      Text(p.hospitalName, style: GoogleFonts.inter(color: t.textSecondary.withValues(alpha: 0.7), fontSize: 12)),
-                    ],
-                  ),
-                  Text(
-                    "${p.date.day}/${p.date.month}/${p.date.year}",
-                    style: GoogleFonts.inter(fontWeight: FontWeight.w500, fontSize: 14, color: t.textPrimary),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              Text(
-                'Diagnosis: ${p.diagnosis}',
-                style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14, color: t.textPrimary),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Medicines:',
-                style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14, color: t.textSecondary),
-              ),
-              const SizedBox(height: 8),
-              Flexible(
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  itemCount: p.medicines.length,
-                  separatorBuilder: (context, index) => Divider(color: t.border),
-                  itemBuilder: (context, index) {
-                    final med = p.medicines[index];
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(Icons.circle, size: 8, color: t.brandSecondary),
-                              const SizedBox(width: 8),
-                              Text(
-                                '${med.name} (${med.dosage})',
-                                style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 14, color: t.textPrimary),
-                              ),
-                              const Spacer(),
-                              Text(
-                                med.duration,
-                                style: GoogleFonts.inter(color: t.textSecondary, fontSize: 13),
-                              ),
-                            ],
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.only(left: 16, top: 4),
-                            child: Text(
-                              med.instruction,
-                              style: GoogleFonts.inter(color: t.textSecondary, fontSize: 13),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 20),
-              if (p.clinicalNotes.isNotEmpty) ...[
-                Text(
-                  'Clinical Notes:',
-                  style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14, color: t.textSecondary),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  p.clinicalNotes,
-                  style: GoogleFonts.inter(fontSize: 13, color: t.textSecondary, height: 1.5),
-                ),
-              ],
-              const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: const Text('Prescription PDF download initiated.'),
-                          backgroundColor: t.success,
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.download_rounded),
-                    label: const Text('Download PDF'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: t.brandPrimary,
-                      side: BorderSide(color: t.brandPrimary),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  AppButton(
-                    label: 'Close',
-                    onPressed: () => Navigator.pop(context),
-                    variant: AppButtonVariant.primary,
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
+      builder: (context) => PdfViewDialog(
+        title: 'Prescription_${p.id}.pdf',
+        content: PrescriptionPdfView(prescription: p),
       ),
     );
   }
 
   void _viewLabReportDetails(BuildContext context, LabReport report) {
-    final t = AppColors.of(context);
     showDialog(
       context: context,
-      builder: (context) => Dialog(
-        backgroundColor: t.bgCard,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-          side: BorderSide(color: t.border),
-        ),
-        child: Container(
-          width: 750,
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Lab Report Result',
-                    style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: t.textPrimary),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: Icon(Icons.close_rounded, color: t.textSecondary),
-                  ),
-                ],
-              ),
-              Divider(color: t.border),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        report.testName,
-                        style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 16, color: t.brandSecondary),
-                      ),
-                      Text(
-                        'Prescribed by: ${report.doctorName}',
-                        style: GoogleFonts.inter(color: t.textSecondary, fontSize: 13),
-                      ),
-                      Text(
-                        'Facility: ${report.hospitalName}',
-                        style: GoogleFonts.inter(color: t.textSecondary.withValues(alpha: 0.7), fontSize: 12),
-                      ),
-                    ],
-                  ),
-                  Text(
-                    "${report.date.day}/${report.date.month}/${report.date.year}",
-                    style: GoogleFonts.inter(fontWeight: FontWeight.w500, fontSize: 14, color: t.textPrimary),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              if (report.aiInterpretation.isNotEmpty) ...[
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: t.warning.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: t.warning.withValues(alpha: 0.3)),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(Icons.auto_awesome_rounded, color: t.warning),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'AI Clinical Insight',
-                              style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13, color: t.warning),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              report.aiInterpretation,
-                              style: GoogleFonts.inter(fontSize: 12, color: t.textSecondary, height: 1.5),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-              ],
-              Container(
-                color: t.bgInput,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                child: Row(
-                  children: [
-                    Expanded(flex: 3, child: Text('Parameter', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13, color: t.textPrimary))),
-                    Expanded(child: Text('Value', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13, color: t.textPrimary))),
-                    Expanded(child: Text('Unit', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13, color: t.textPrimary))),
-                    Expanded(flex: 2, child: Text('Ref. Range', style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13, color: t.textPrimary))),
-                  ],
-                ),
-              ),
-              Divider(height: 1, color: t.border),
-              Flexible(
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: report.results.length,
-                  itemBuilder: (context, index) {
-                    final res = report.results[index];
-                    final isAbnormal = res.status != 'Normal';
-                    final valColor = isAbnormal ? t.danger : t.textPrimary;
-
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      child: Row(
-                        children: [
-                          Expanded(flex: 3, child: Text(res.parameter, style: GoogleFonts.inter(fontSize: 13, color: t.textPrimary))),
-                          Expanded(
-                            child: Text(
-                              res.value,
-                              style: GoogleFonts.inter(
-                                fontSize: 13, 
-                                fontWeight: isAbnormal ? FontWeight.bold : FontWeight.normal,
-                                color: valColor,
-                              ),
-                            ),
-                          ),
-                          Expanded(child: Text(res.unit, style: GoogleFonts.inter(fontSize: 13, color: t.textSecondary))),
-                          Expanded(
-                            flex: 2, 
-                            child: Row(
-                              children: [
-                                Text(res.referenceRange, style: GoogleFonts.inter(fontSize: 13, color: t.textPrimary)),
-                                if (isAbnormal) ...[
-                                  const SizedBox(width: 8),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(color: t.danger.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(4)),
-                                    child: Text(
-                                      'High',
-                                      style: GoogleFonts.inter(color: t.danger, fontSize: 9, fontWeight: FontWeight.bold),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: const Text('Report data exported to CSV.'), backgroundColor: t.success),
-                      );
-                    },
-                    icon: const Icon(Icons.share_rounded),
-                    label: const Text('Share/Export'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: t.brandPrimary,
-                      side: BorderSide(color: t.brandPrimary),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  AppButton(
-                    label: 'Close',
-                    onPressed: () => Navigator.pop(context),
-                    variant: AppButtonVariant.primary,
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
+      builder: (context) => PdfViewDialog(
+        title: 'LabReport_${report.id}.pdf',
+        content: LabReportPdfView(report: report),
       ),
     );
   }
 
-  void _viewImagingReportDetails(BuildContext context, ImagingReport report) {
+  void _viewImagingReportDetails(BuildContext context, ImagingReport report, AppTranslations tr) {
     final t = AppColors.of(context);
     showDialog(
       context: context,
@@ -722,7 +430,7 @@ class MedicalVaultPage extends ConsumerWidget {
                                   Icon(Icons.broken_image_outlined, color: t.textSecondary.withValues(alpha: 0.3), size: 56),
                                   const SizedBox(height: 12),
                                   Text(
-                                    'Scan Image Placeholder',
+                                    tr('patient_scan_placeholder'),
                                     style: GoogleFonts.inter(color: t.textSecondary.withValues(alpha: 0.4)),
                                   ),
                                 ],
@@ -738,7 +446,7 @@ class MedicalVaultPage extends ConsumerWidget {
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                           decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(8)),
                           child: Text(
-                            '${report.type} (SECURE MOCK)',
+                            '${report.type} ${tr('patient_secure_mock')}',
                             style: GoogleFonts.inter(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
                           ),
                         ),
@@ -759,7 +467,7 @@ class MedicalVaultPage extends ConsumerWidget {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          'Imaging Findings',
+                          tr('patient_imaging_findings'),
                           style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: t.textPrimary),
                         ),
                         IconButton(
@@ -770,17 +478,17 @@ class MedicalVaultPage extends ConsumerWidget {
                     ),
                     Divider(color: t.border),
                     Text(
-                      'Exam Details:',
+                      tr('patient_exam_details'),
                       style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13, color: t.textSecondary),
                     ),
                     const SizedBox(height: 6),
-                    Text('Body Part: ${report.bodyPart}', style: GoogleFonts.inter(fontSize: 13, color: t.textPrimary)),
-                    Text('Facility: ${report.hospitalName}', style: GoogleFonts.inter(fontSize: 13, color: t.textPrimary)),
-                    Text('Referrer: ${report.doctorName}', style: GoogleFonts.inter(fontSize: 13, color: t.textPrimary)),
-                    Text('Date: ${report.date.day}/${report.date.month}/${report.date.year}', style: GoogleFonts.inter(fontSize: 13, color: t.textPrimary)),
+                    Text('${tr('patient_body_part')}: ${report.bodyPart}', style: GoogleFonts.inter(fontSize: 13, color: t.textPrimary)),
+                    Text('${tr('patient_facility')}: ${report.hospitalName}', style: GoogleFonts.inter(fontSize: 13, color: t.textPrimary)),
+                    Text('${tr('patient_referrer')}: ${report.doctorName}', style: GoogleFonts.inter(fontSize: 13, color: t.textPrimary)),
+                    Text('${tr('patient_date')}: ${report.date.day}/${report.date.month}/${report.date.year}', style: GoogleFonts.inter(fontSize: 13, color: t.textPrimary)),
                     const SizedBox(height: 16),
                     Text(
-                      'Findings:',
+                      tr('patient_findings'),
                       style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13, color: t.textSecondary),
                     ),
                     const SizedBox(height: 6),
@@ -794,7 +502,7 @@ class MedicalVaultPage extends ConsumerWidget {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'Impression:',
+                      tr('patient_impression'),
                       style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13, color: t.textSecondary),
                     ),
                     const SizedBox(height: 6),
@@ -812,7 +520,7 @@ class MedicalVaultPage extends ConsumerWidget {
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
                         AppButton(
-                          label: 'Close',
+                          label: tr('patient_close'),
                           onPressed: () => Navigator.pop(context),
                           variant: AppButtonVariant.primary,
                         ),

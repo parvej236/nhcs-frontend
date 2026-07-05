@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/l10n/app_translations.dart';
+import '../../../core/providers/language_provider.dart';
 import '../../../core/widgets/app_primitives.dart';
+import '../../../core/dev/judge_dummy_data.dart';
+import '../../../core/widgets/judge_dummy_field.dart';
 import '../data/models/appointment.dart';
 import '../presentation/providers/booking_provider.dart';
 import '../presentation/providers/patient_providers.dart';
@@ -45,6 +49,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
     final appointmentsState = ref.watch(patientAppointmentsProvider);
     final bookingState = ref.watch(bookingProvider);
     final t = AppColors.of(context);
+    final tr = ref.watch(translationsProvider);
 
     return Scaffold(
       backgroundColor: t.bgMain,
@@ -60,14 +65,27 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
             child: Row(
               children: [
                 Text(
-                  'Appointments Portal',
+                  tr('patient_appointments_portal'),
                   style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold, color: t.textPrimary),
                 ),
                 const Spacer(),
+                IconButton(
+                  icon: Icon(Icons.refresh_rounded, color: t.brandPrimary),
+                  tooltip: tr('patient_reload'),
+                  onPressed: () {
+                    ref.invalidate(patientAppointmentsProvider);
+                    ref.invalidate(bookingProvider);
+                    ref.invalidate(aiSuggestionProvider);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(tr('patient_reloaded')), duration: const Duration(seconds: 1)),
+                    );
+                  },
+                ),
+                const SizedBox(width: 8),
                 AppButton(
                   onPressed: () => _openBookingDialog(null),
                   icon: Icons.add_rounded,
-                  label: 'Book New',
+                  label: tr('patient_book_new'),
                   variant: AppButtonVariant.primary,
                 ),
               ],
@@ -95,7 +113,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
                   appointmentsState.when(
                     loading: () => Center(child: CircularProgressIndicator(color: t.brandPrimary)),
                     error: (err, stack) => Center(
-                      child: Text('Error loading appointments: $err', style: TextStyle(color: t.textSecondary)),
+                      child: Text('${tr('patient_err_loading_appointments')}: $err', style: TextStyle(color: t.textSecondary)),
                     ),
                     data: (appointments) {
                       final filtered = appointments.where((a) => a.status == _activeTab).toList();
@@ -108,7 +126,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
                                 Icon(Icons.calendar_today_rounded, size: 40, color: t.textSecondary.withValues(alpha: 0.5)),
                                 const SizedBox(height: 12),
                                 Text(
-                                  'No $_activeTab appointments found.',
+                                  '${tr('patient_no_appointments_prefix')} ${_tabLabel(tr, _activeTab)} ${tr('patient_no_appointments_suffix')}',
                                   style: GoogleFonts.inter(color: t.textSecondary),
                                 ),
                               ],
@@ -135,7 +153,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
 
                   // Find Doctor Section
                   Text(
-                    'Find a Medical Specialist',
+                    tr('patient_find_specialist'),
                     style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w600, color: t.textPrimary),
                   ),
                   const SizedBox(height: 16),
@@ -156,8 +174,17 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
     );
   }
 
+  static const Map<String, String> _tabKeys = {
+    'Upcoming': 'patient_tab_upcoming',
+    'Past': 'patient_tab_past',
+    'Cancelled': 'patient_tab_cancelled',
+  };
+
+  String _tabLabel(AppTranslations tr, String label) => tr(_tabKeys[label] ?? label);
+
   Widget _tab(BuildContext context, String label) {
     final t = AppColors.of(context);
+    final tr = ref.watch(translationsProvider);
     final active = _activeTab == label;
     return InkWell(
       onTap: () => setState(() => _activeTab = label),
@@ -170,7 +197,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
           border: Border.all(color: active ? t.brandPrimary : t.border),
         ),
         child: Text(
-          label,
+          _tabLabel(tr, label),
           style: GoogleFonts.inter(
             color: active ? Colors.white : t.textSecondary,
             fontWeight: FontWeight.w500,
@@ -183,6 +210,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
 
   Widget _buildAppointmentCard(BuildContext context, Appointment app) {
     final t = AppColors.of(context);
+    final tr = ref.watch(translationsProvider);
     final dateStr = "${app.date.day} ${_getMonthName(app.date.month)} ${app.date.year}";
     final statusColor = _getStatusColor(context, app.status);
 
@@ -250,7 +278,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(color: t.warning.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(6)),
                     child: Text(
-                      'Pending Approval',
+                      tr('patient_pending_approval'),
                       style: GoogleFonts.inter(color: t.warning, fontSize: 11, fontWeight: FontWeight.w600),
                     ),
                   )
@@ -259,7 +287,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(color: t.danger.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(6)),
                     child: Text(
-                      'Rejected',
+                      tr('patient_rejected'),
                       style: GoogleFonts.inter(color: t.danger, fontSize: 11, fontWeight: FontWeight.w600),
                     ),
                   )
@@ -269,7 +297,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(color: t.success.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(6)),
                       child: Text(
-                        'Checked In',
+                        tr('patient_checked_in'),
                         style: GoogleFonts.inter(color: t.success, fontSize: 11, fontWeight: FontWeight.w600),
                       ),
                     )
@@ -278,18 +306,45 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(color: t.textSecondary.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(6)),
                       child: Text(
-                        'Completed',
+                        tr('patient_completed'),
                         style: GoogleFonts.inter(color: t.textSecondary, fontSize: 11, fontWeight: FontWeight.w600),
                       ),
                     )
                   else
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(color: t.brandSecondary.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(6)),
-                      child: Text(
-                        'Approved',
-                        style: GoogleFonts.inter(color: t.brandSecondary, fontSize: 11, fontWeight: FontWeight.w600),
-                      ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(color: t.brandSecondary.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(6)),
+                          child: Text(
+                            tr('patient_approved'),
+                            style: GoogleFonts.inter(color: t.brandSecondary, fontSize: 11, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                        PopupMenuButton<String>(
+                          icon: Icon(Icons.more_vert_rounded, size: 18, color: t.textSecondary),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 150),
+                          onSelected: (val) {
+                            if (val == 'cancel') {
+                              _confirmCancel(context, app.id);
+                            }
+                          },
+                          itemBuilder: (context) => [
+                            PopupMenuItem<String>(
+                              value: 'cancel',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.cancel_outlined, size: 16, color: t.danger),
+                                  const SizedBox(width: 8),
+                                  Text(tr('patient_cancel_appointment_menu'), style: GoogleFonts.inter(color: t.danger, fontSize: 12)),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                 ]
               ] else
@@ -297,20 +352,20 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(color: statusColor.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(6)),
                   child: Text(
-                    app.status,
+                    _tabLabel(tr, app.status),
                     style: GoogleFonts.inter(color: statusColor, fontSize: 11, fontWeight: FontWeight.w600),
                   ),
                 ),
               const SizedBox(height: 8),
               Text(
-                'Queue: ${app.queueNumber}',
+                '${tr('patient_queue')}: ${app.queueNumber}',
                 style: GoogleFonts.inter(color: t.textSecondary, fontSize: 12, fontWeight: FontWeight.w500),
               ),
               if (app.status == 'Upcoming' && app.approvalStatus == 'PENDING') ...[
                 const SizedBox(height: 4),
                 TextButton(
                   onPressed: () => _confirmCancel(context, app.id),
-                  child: Text('Cancel', style: GoogleFonts.inter(color: t.danger, fontSize: 12)),
+                  child: Text(tr('patient_cancel'), style: GoogleFonts.inter(color: t.danger, fontSize: 12)),
                 ),
               ],
             ],
@@ -322,6 +377,14 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
 
   Widget _buildDoctorFilters(BuildContext context) {
     final t = AppColors.of(context);
+    final tr = ref.watch(translationsProvider);
+    const specKeys = {
+      'All Specializations': 'patient_spec_all',
+      'Cardiology': 'patient_spec_cardiology',
+      'Endocrinology': 'patient_spec_endocrinology',
+      'General Medicine': 'patient_spec_general_medicine',
+      'Gynaecology & Obstetrics': 'patient_spec_gynae',
+    };
     return Row(
       children: [
         Expanded(
@@ -330,7 +393,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
             style: GoogleFonts.inter(color: t.textPrimary, fontSize: 14),
             onChanged: (val) => setState(() => _searchQuery = val.toLowerCase()),
             decoration: InputDecoration(
-              hintText: 'Search by doctor name or specialization...',
+              hintText: tr('patient_search_doctor_placeholder'),
               hintStyle: GoogleFonts.inter(color: t.textSecondary, fontSize: 14),
               prefixIcon: Icon(Icons.search_rounded, color: t.textSecondary),
               filled: true,
@@ -357,7 +420,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
                 icon: Icon(Icons.arrow_drop_down, color: t.textSecondary),
                 style: GoogleFonts.inter(fontSize: 14, color: t.textPrimary),
                 items: ['All Specializations', 'Cardiology', 'Endocrinology', 'General Medicine', 'Gynaecology & Obstetrics']
-                    .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                    .map((e) => DropdownMenuItem(value: e, child: Text(tr(specKeys[e] ?? e))))
                     .toList(),
                 onChanged: (val) => setState(() => _specializationFilter = val ?? 'All Specializations'),
                 isExpanded: true,
@@ -384,7 +447,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 20),
           child: Text(
-            'No doctors match your search filters.',
+            ref.watch(translationsProvider)('patient_no_doctors_match'),
             style: GoogleFonts.inter(color: t.textSecondary),
           ),
         ),
@@ -405,6 +468,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
 
   Widget _buildDoctorCard(BuildContext context, DoctorSpecialist doc) {
     final t = AppColors.of(context);
+    final tr = ref.watch(translationsProvider);
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -440,7 +504,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
                 Row(
                   children: [
                     Text(
-                      '${doc.experienceYears} years exp.',
+                      '${doc.experienceYears} ${tr('patient_years_exp')}',
                       style: GoogleFonts.inter(color: t.textSecondary, fontSize: 12),
                     ),
                     const SizedBox(width: 12),
@@ -463,7 +527,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
               ),
               const SizedBox(height: 8),
               AppButton(
-                label: 'Book Slot',
+                label: tr('patient_book_slot'),
                 onPressed: () => _openBookingDialog(doc),
                 variant: AppButtonVariant.primary,
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -478,6 +542,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
 
   void _confirmCancel(BuildContext context, String appointmentId) {
     final t = AppColors.of(context);
+    final tr = ref.read(translationsProvider);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -487,24 +552,24 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
           side: BorderSide(color: t.border),
         ),
         title: Text(
-          'Cancel Appointment',
+          tr('patient_cancel_appointment_title'),
           style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: t.textPrimary),
         ),
         content: Text(
-          'Are you sure you want to cancel this appointment? This action cannot be undone.',
+          tr('patient_cancel_appointment_confirm'),
           style: GoogleFonts.inter(color: t.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('No, Keep', style: TextStyle(color: t.textSecondary)),
+            child: Text(tr('patient_no_keep'), style: TextStyle(color: t.textSecondary)),
           ),
           AppButton(
             onPressed: () {
               ref.read(patientAppointmentsProvider.notifier).cancelAppointment(appointmentId);
               Navigator.pop(context);
             },
-            label: 'Yes, Cancel',
+            label: tr('patient_yes_cancel'),
             variant: AppButtonVariant.danger,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           ),
@@ -550,6 +615,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
   Widget _buildAiSmartBookingAssistant(BuildContext context) {
     final aiState = ref.watch(aiSuggestionProvider);
     final t = AppColors.of(context);
+    final tr = ref.watch(translationsProvider);
 
     return Container(
       width: double.infinity,
@@ -591,7 +657,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
                     const Icon(Icons.auto_awesome, color: Colors.white, size: 14),
                     const SizedBox(width: 6),
                     Text(
-                      'AI Smart Booking',
+                      tr('patient_ai_smart_booking'),
                       style: GoogleFonts.inter(
                         color: Colors.white,
                         fontSize: 12,
@@ -604,7 +670,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  'AI-Powered Appointment Assistant',
+                  tr('patient_ai_booking_assistant'),
                   style: GoogleFonts.outfit(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -616,7 +682,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
           ),
           const SizedBox(height: 12),
           Text(
-            'Describe your medical symptoms in Bangla or English, or use voice input. The AI will analyze your condition, summarize your symptoms, recommend the proper specialist, and locate the nearest hospitals and doctors.',
+            tr('patient_ai_booking_desc'),
             style: GoogleFonts.inter(
               color: t.textSecondary,
               fontSize: 13.5,
@@ -630,14 +696,14 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: TextField(
+                child: JudgeDummyField(
                   controller: _symptomController,
+                  dummyValue: JudgeDummyData.patient_appointments_textField_aiSymptom,
                   maxLines: 3,
-                  style: GoogleFonts.inter(fontSize: 14, color: t.textPrimary),
                   decoration: InputDecoration(
                     hintText: aiState.isListening
-                        ? 'আমি শুনছি, বলুন... (উদা: আমার মাথা ব্যাথ ও বমি বমি ভাব)'
-                        : 'আপনার সমস্যাটি বিস্তারিত লিখুন বা বলুন (উদা: কয়েক দিন ধরে বুকে ব্যথা ও শ্বাসকষ্ট)...',
+                        ? tr('patient_ai_hint_listening')
+                        : tr('patient_ai_hint_idle'),
                     hintStyle: GoogleFonts.inter(color: t.textSecondary, fontSize: 13.5),
                     fillColor: t.bgInput,
                     filled: true,
@@ -665,7 +731,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
                 children: [
                   // Speech recognition button
                   Tooltip(
-                    message: aiState.isListening ? 'Stop Listening' : 'Speak in Bangla',
+                    message: aiState.isListening ? tr('patient_stop_listening') : tr('patient_speak_in_bangla'),
                     child: InkWell(
                       onTap: () {
                         if (aiState.isListening) {
@@ -704,7 +770,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
                       ref.read(aiSuggestionProvider.notifier).reset();
                     },
                     child: Text(
-                      'Clear',
+                      tr('patient_clear'),
                       style: GoogleFonts.inter(
                         color: t.textSecondary,
                         fontSize: 13,
@@ -731,7 +797,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'Listening... Speak in Bangla (বাংলায় বলুন)',
+                  tr('patient_listening_status'),
                   style: GoogleFonts.inter(
                     color: t.danger,
                     fontSize: 12,
@@ -765,7 +831,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
                     )
                   : const Icon(Icons.auto_awesome, size: 18),
               label: Text(
-                aiState.isLoading ? 'AI Analyzing Symptoms...' : 'Analyze Symptoms with AI',
+                aiState.isLoading ? tr('patient_ai_analyzing') : tr('patient_ai_analyze_btn'),
                 style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14),
               ),
               style: ElevatedButton.styleFrom(
@@ -806,14 +872,14 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
             const SizedBox(height: 24),
             Divider(color: t.border),
             const SizedBox(height: 16),
-            _buildAiResultsSection(context, aiState.suggestion!),
+            _buildAiResultsSection(context, aiState.suggestion!, tr),
           ],
         ],
       ),
     );
   }
 
-  Widget _buildAiResultsSection(BuildContext context, AiSuggestionResponse suggestion) {
+  Widget _buildAiResultsSection(BuildContext context, AiSuggestionResponse suggestion, AppTranslations tr) {
     final t = AppColors.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -824,7 +890,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
             Icon(Icons.description_outlined, color: t.brandPrimary, size: 20),
             const SizedBox(width: 8),
             Text(
-              'AI Health Summary (স্বাস্থ্য সারসংক্ষেপ):',
+              tr('patient_ai_health_summary'),
               style: GoogleFonts.outfit(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
@@ -846,7 +912,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'English Summary:',
+                tr('patient_english_summary'),
                 style: GoogleFonts.inter(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
@@ -864,7 +930,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
               ),
               const SizedBox(height: 12),
               Text(
-                'বাংলা সারসংক্ষেপ:',
+                tr('patient_bangla_summary'),
                 style: GoogleFonts.inter(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
@@ -891,7 +957,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
             Icon(Icons.category_outlined, color: t.brandPrimary, size: 20),
             const SizedBox(width: 8),
             Text(
-              'Recommended Specialization:',
+              tr('patient_recommended_specialization'),
               style: GoogleFonts.outfit(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
@@ -924,7 +990,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
             Icon(Icons.location_on_rounded, color: t.brandPrimary, size: 20),
             const SizedBox(width: 8),
             Text(
-              'Nearby Matching Hospitals:',
+              tr('patient_nearby_hospitals'),
               style: GoogleFonts.outfit(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
@@ -1005,7 +1071,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
             Icon(Icons.people_outline_rounded, color: t.brandPrimary, size: 20),
             const SizedBox(width: 8),
             Text(
-              'Recommended Doctors:',
+              tr('patient_recommended_doctors'),
               style: GoogleFonts.outfit(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
@@ -1019,7 +1085,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 20),
             child: Text(
-              'No matching doctors found for this specialization.',
+              tr('patient_no_matching_doctors_spec'),
               style: GoogleFonts.inter(color: t.textSecondary, fontStyle: FontStyle.italic),
             ),
           )
@@ -1110,7 +1176,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
                               ),
                               const SizedBox(width: 8),
                               Text(
-                                '${doc.experienceYears} Yrs Exp',
+                                '${doc.experienceYears} ${tr('patient_yrs_exp_short')}',
                                 style: GoogleFonts.inter(
                                   fontSize: 11,
                                   color: t.textSecondary,
@@ -1136,7 +1202,7 @@ class _AppointmentsPageState extends ConsumerState<AppointmentsPage> {
                         ),
                         const SizedBox(height: 8),
                         AppButton(
-                          label: 'Book Slot',
+                          label: tr('patient_book_slot'),
                           onPressed: () => _openBookingDialog(doc),
                           variant: AppButtonVariant.primary,
                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -1169,6 +1235,7 @@ class _BookingWizardDialogState extends ConsumerState<_BookingWizardDialog> {
     final bookingState = ref.watch(bookingProvider);
     final isDoctorSelected = bookingState.selectedDoctor != null;
     final t = AppColors.of(context);
+    final tr = ref.watch(translationsProvider);
 
     if (isDoctorSelected && _step == 0) {
       _step = 1;
@@ -1189,7 +1256,7 @@ class _BookingWizardDialogState extends ConsumerState<_BookingWizardDialog> {
             Row(
               children: [
                 Text(
-                  bookingState.createdAppointment != null ? 'Booking Confirmed' : 'Book Appointment',
+                  bookingState.createdAppointment != null ? tr('patient_booking_confirmed') : tr('patient_book_appointment_title'),
                   style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold, color: t.textPrimary),
                 ),
                 const Spacer(),
@@ -1236,12 +1303,13 @@ class _BookingWizardDialogState extends ConsumerState<_BookingWizardDialog> {
 
   Widget _buildDoctorSelectorStep(BuildContext context, BookingState state) {
     final t = AppColors.of(context);
+    final tr = ref.watch(translationsProvider);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 8),
         Text(
-          'Select a Doctor to begin:',
+          tr('patient_select_doctor_begin'),
           style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14, color: t.textPrimary),
         ),
         const SizedBox(height: 16),
@@ -1273,13 +1341,14 @@ class _BookingWizardDialogState extends ConsumerState<_BookingWizardDialog> {
 
   Widget _buildDateTimeSelectorStep(BuildContext context, BookingState state) {
     final t = AppColors.of(context);
-    final next7Days = List.generate(7, (i) => DateTime.now().add(Duration(days: i + 1)));
+    final tr = ref.watch(translationsProvider);
+    final next7Days = List.generate(7, (i) => DateTime.now().add(Duration(days: i)));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const SizedBox(height: 8),
-        Text('Select Date:', style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14, color: t.textPrimary)),
+        Text(tr('patient_select_date'), style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14, color: t.textPrimary)),
         const SizedBox(height: 12),
         SizedBox(
           height: 64,
@@ -1332,7 +1401,7 @@ class _BookingWizardDialogState extends ConsumerState<_BookingWizardDialog> {
           ),
         ),
         const SizedBox(height: 24),
-        Text('Select Time Slot:', style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14, color: t.textPrimary)),
+        Text(tr('patient_select_time_slot'), style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14, color: t.textPrimary)),
         const SizedBox(height: 12),
         Expanded(
           child: GridView.builder(
@@ -1386,6 +1455,7 @@ class _BookingWizardDialogState extends ConsumerState<_BookingWizardDialog> {
 
   Widget _buildConfirmationStep(BuildContext context, BookingState state) {
     final t = AppColors.of(context);
+    final tr = ref.watch(translationsProvider);
     final doc = state.selectedDoctor!;
     final dateStr = state.selectedDate != null
         ? "${state.selectedDate!.day} ${_getMonthName(state.selectedDate!.month)} ${state.selectedDate!.year}"
@@ -1407,7 +1477,7 @@ class _BookingWizardDialogState extends ConsumerState<_BookingWizardDialog> {
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  'Please review the details below before confirming the booking.',
+                  tr('patient_review_details'),
                   style: GoogleFonts.inter(color: t.brandPrimary, fontSize: 13, fontWeight: FontWeight.w500),
                 ),
               ),
@@ -1415,18 +1485,19 @@ class _BookingWizardDialogState extends ConsumerState<_BookingWizardDialog> {
           ),
         ),
         const SizedBox(height: 24),
-        _detailRow(context, 'Doctor', doc.name),
-        _detailRow(context, 'Specialization', doc.specialization),
-        _detailRow(context, 'Hospital', doc.hospital),
-        _detailRow(context, 'Date', dateStr),
-        _detailRow(context, 'Time Slot', state.selectedTimeSlot ?? ''),
-        _detailRow(context, 'Consultation Fee', '৳${doc.consultationFee}', isBold: true),
+        _detailRow(context, tr('patient_doctor'), doc.name),
+        _detailRow(context, tr('patient_specialization'), doc.specialization),
+        _detailRow(context, tr('patient_hospital'), doc.hospital),
+        _detailRow(context, tr('patient_date'), dateStr),
+        _detailRow(context, tr('patient_time_slot'), state.selectedTimeSlot ?? ''),
+        _detailRow(context, tr('patient_consultation_fee'), '৳${doc.consultationFee}', isBold: true),
       ],
     );
   }
 
   Widget _buildSuccessView(BuildContext context, Appointment app) {
     final t = AppColors.of(context);
+    final tr = ref.watch(translationsProvider);
     final dateStr = "${app.date.day} ${_getMonthName(app.date.month)} ${app.date.year}";
     return Center(
       child: Column(
@@ -1439,12 +1510,12 @@ class _BookingWizardDialogState extends ConsumerState<_BookingWizardDialog> {
           ),
           const SizedBox(height: 20),
           Text(
-            'Appointment Placed!',
+            tr('patient_appointment_placed'),
             style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.bold, color: t.textPrimary),
           ),
           const SizedBox(height: 8),
           Text(
-            'Your appointment with ${app.doctor.name} has been booked.',
+            '${tr('patient_appointment_booked_with_prefix')} ${app.doctor.name} ${tr('patient_appointment_booked_with_suffix')}',
             textAlign: TextAlign.center,
             style: GoogleFonts.inter(color: t.textSecondary, fontSize: 14),
           ),
@@ -1455,18 +1526,18 @@ class _BookingWizardDialogState extends ConsumerState<_BookingWizardDialog> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _successStat(context, 'Queue', app.queueNumber),
+                _successStat(context, tr('patient_queue'), app.queueNumber),
                 Container(width: 1, height: 32, color: t.border),
-                _successStat(context, 'Time', app.timeSlot),
+                _successStat(context, tr('patient_time'), app.timeSlot),
                 Container(width: 1, height: 32, color: t.border),
-                _successStat(context, 'Date', dateStr),
+                _successStat(context, tr('patient_date'), dateStr),
               ],
             ),
           ),
           const SizedBox(height: 24),
           AppButton(
             onPressed: () => Navigator.pop(context),
-            label: 'Back to Dashboard',
+            label: tr('patient_back_to_dashboard'),
             variant: AppButtonVariant.primary,
           ),
         ],
@@ -1508,13 +1579,14 @@ class _BookingWizardDialogState extends ConsumerState<_BookingWizardDialog> {
 
   Widget _buildActionsRow(BuildContext context, BookingState state) {
     final t = AppColors.of(context);
+    final tr = ref.watch(translationsProvider);
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         if (_step > 0)
           AppButton(
             onPressed: () => setState(() => _step--),
-            label: 'Back',
+            label: tr('patient_back'),
             variant: AppButtonVariant.secondary,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           )
@@ -1524,7 +1596,7 @@ class _BookingWizardDialogState extends ConsumerState<_BookingWizardDialog> {
           children: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: Text('Cancel', style: TextStyle(color: t.textSecondary)),
+              child: Text(tr('patient_cancel'), style: TextStyle(color: t.textSecondary)),
             ),
             const SizedBox(width: 12),
             if (_step < 2)
@@ -1533,7 +1605,7 @@ class _BookingWizardDialogState extends ConsumerState<_BookingWizardDialog> {
                            (state.selectedDate != null && state.selectedTimeSlot != null && _step == 1)
                     ? () => setState(() => _step++)
                     : null,
-                label: 'Next',
+                label: tr('patient_next'),
                 variant: AppButtonVariant.primary,
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               )
@@ -1542,7 +1614,7 @@ class _BookingWizardDialogState extends ConsumerState<_BookingWizardDialog> {
                 onPressed: () async {
                   await ref.read(bookingProvider.notifier).confirmBooking('NUD-892-441-X7', ref);
                 },
-                label: 'Confirm Booking',
+                label: tr('patient_confirm_booking'),
                 variant: AppButtonVariant.primary,
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               ),

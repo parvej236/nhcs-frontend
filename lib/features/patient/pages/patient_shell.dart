@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/widgets/sidebar.dart';
-import '../../public/widgets/public_sections.dart';
 import '../presentation/providers/patient_providers.dart';
 import 'patient_dashboard_page.dart';
 import 'health_timeline_page.dart';
 import 'appointments_page.dart';
 import 'medical_vault_page.dart';
 import 'patient_profile_page.dart';
+import 'health_copilot_page.dart';
+import 'blood_donation_page.dart';
 
 class PatientShell extends ConsumerWidget {
   const PatientShell({super.key});
@@ -18,12 +19,8 @@ class PatientShell extends ConsumerWidget {
     const AppointmentsPage(),
     const MedicalVaultPage(),
     const PatientProfilePage(),
-    const Padding(
-      padding: EdgeInsets.all(24.0),
-      child: SingleChildScrollView(
-        child: VitalsChecker(),
-      ),
-    ),
+    const HealthCopilotPage(),
+    const BloodDonationPage(),
   ];
 
   @override

@@ -21,6 +21,7 @@ abstract class HospitalRepository {
   Future<List<StaffMember>> getStaffMembers();
   Future<List<DoctorVerificationRequest>> getDoctorVerificationRequests();
   Future<List<LabTestOrder>> getLabTestOrders();
+  Future<void> publishLabOrder(String orderId, List<Map<String, String>> results);
   Future<List<BedAllocation>> getBedAllocations();
   Future<List<PharmacyItem>> getPharmacyItems();
   Future<Map<String, dynamic>?> getPrescriptionById(String rxId);
@@ -151,7 +152,29 @@ class HospitalRepositoryImpl implements HospitalRepository {
 
   @override
   Future<List<LabTestOrder>> getLabTestOrders() async {
-    return _datasource.labOrders;
+    // Real pending lab requests raised by doctors, straight from the backend.
+    final response = await dio.get('/hospitals/lab-orders');
+    final data = response.data as List<dynamic>;
+    return data.map((item) {
+      final map = item as Map<String, dynamic>;
+      return LabTestOrder(
+        id: map['id']?.toString() ?? '',
+        patient: map['patientName']?.toString() ?? 'Unknown',
+        healthId: map['healthId']?.toString() ?? '',
+        test: map['testName']?.toString() ?? '',
+        doctor: map['doctorName']?.toString() ?? 'Attending Physician',
+        status: map['status']?.toString() ?? 'PENDING',
+        results: const {},
+      );
+    }).toList();
+  }
+
+  @override
+  Future<void> publishLabOrder(String orderId, List<Map<String, String>> results) async {
+    // Publishes the scanned report to the backend. The report is marked
+    // 'Published' and its results attached, so it flows into the patient's
+    // Medical Vault (/patients/me/lab-reports).
+    await dio.post('/hospitals/lab-orders/$orderId/results', data: {'results': results});
   }
 
   @override

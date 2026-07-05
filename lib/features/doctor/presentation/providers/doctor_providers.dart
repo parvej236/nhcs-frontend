@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/legacy.dart';
 import '../../data/models/doctor_dashboard_summary.dart';
 import '../../data/models/patient_queue_item.dart';
 import '../../data/models/report_review_item.dart';
+import '../../data/models/schedule_slot.dart';
 import '../../data/repositories/doctor_repository.dart';
 
 import '../../../../core/providers/dio_provider.dart';
@@ -46,6 +47,16 @@ class PendingReportsNotifier extends StateNotifier<AsyncValue<List<ReportReviewI
     }
   }
 
+  /// Injects a freshly-confirmed lab report (from the hospital Laboratory
+  /// confirmation flow) into the top of the doctor's review queue, without a
+  /// backend round-trip. Keeps the report list live across portals.
+  void addReportFromLab(ReportReviewItem item) {
+    final current = state.asData?.value ?? const <ReportReviewItem>[];
+    // Avoid duplicates if the same report is submitted twice.
+    final deduped = current.where((r) => r.id != item.id).toList();
+    state = AsyncValue.data([item, ...deduped]);
+  }
+
   Future<void> reviewReport(String reportId) async {
     try {
       await _repository.reviewReport(reportId);
@@ -64,7 +75,7 @@ final pendingReportsProvider = StateNotifierProvider<PendingReportsNotifier, Asy
 });
 
 // Schedule slots provider (for a given day)
-final doctorScheduleProvider = FutureProvider.family<List<String>, String>((ref, day) async {
+final doctorScheduleProvider = FutureProvider.family<List<ScheduleSlot>, String>((ref, day) async {
   final repository = ref.watch(doctorRepositoryProvider);
   return repository.getScheduleSlots(day);
 });
@@ -74,4 +85,11 @@ final patientSearchProvider = FutureProvider.family<dynamic, String>((ref, healt
   if (healthId.isEmpty) return null;
   final repository = ref.watch(doctorRepositoryProvider);
   return repository.getPatientProfileByHealthId(healthId);
+});
+
+// Active doctor profile provider
+final doctorProfileProvider = FutureProvider<Map<String, dynamic>>((ref) async {
+  final dio = ref.watch(dioProvider);
+  final response = await dio.get('/doctors/profile');
+  return response.data as Map<String, dynamic>;
 });

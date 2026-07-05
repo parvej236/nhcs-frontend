@@ -141,7 +141,7 @@ final doctorVerificationsProvider = StateNotifierProvider<DoctorVerificationsNot
   return DoctorVerificationsNotifier(repo, ref);
 });
 
-// 5. Laboratory Queue Provider
+// 5. Laboratory Queue Provider — backed by the real backend lab-order queue.
 class LaboratoryQueueNotifier extends StateNotifier<List<LabTestOrder>> {
   final HospitalRepository _repository;
   final Ref _ref;
@@ -150,13 +150,26 @@ class LaboratoryQueueNotifier extends StateNotifier<List<LabTestOrder>> {
     loadOrders();
   }
 
-  void loadOrders() async {
-    state = await _repository.getLabTestOrders();
+  Future<void> loadOrders() async {
+    try {
+      state = await _repository.getLabTestOrders();
+    } catch (_) {
+      // Keep the current list on a transient network failure.
+    }
+  }
+
+  /// Publishes the scanned report for [orderId] to the backend (status
+  /// 'Published' + attached results) so it lands in the patient's Medical
+  /// Vault, then refreshes the pending queue.
+  Future<void> publishOrder(String orderId, List<Map<String, String>> results) async {
+    await _repository.publishLabOrder(orderId, results);
+    await loadOrders();
+    _ref.read(hospitalDashboardStatsProvider.notifier).refresh();
   }
 
   Future<void> advanceStage(String orderId, {Map<String, String>? results}) async {
     await _repository.advanceLabOrder(orderId, results);
-    state = await _repository.getLabTestOrders();
+    await loadOrders();
     _ref.read(hospitalDashboardStatsProvider.notifier).refresh();
   }
 }

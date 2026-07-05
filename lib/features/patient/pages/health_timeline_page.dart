@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/providers/language_provider.dart';
 import '../data/models/health_event.dart';
 import '../presentation/providers/patient_providers.dart';
 
@@ -19,6 +20,7 @@ class _HealthTimelinePageState extends ConsumerState<HealthTimelinePage> {
   Widget build(BuildContext context) {
     final timelineState = ref.watch(patientTimelineProvider);
     final t = AppColors.of(context);
+    final tr = ref.watch(translationsProvider);
 
     return Scaffold(
       backgroundColor: t.bgMain,
@@ -34,10 +36,21 @@ class _HealthTimelinePageState extends ConsumerState<HealthTimelinePage> {
             child: Row(
               children: [
                 Text(
-                  'Health Timeline',
+                  tr('patient_health_timeline'),
                   style: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.bold, color: t.textPrimary),
                 ),
                 const Spacer(),
+                IconButton(
+                  icon: Icon(Icons.refresh_rounded, color: t.brandPrimary),
+                  tooltip: tr('patient_reload'),
+                  onPressed: () {
+                    ref.invalidate(patientTimelineProvider);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(tr('patient_reloaded')), duration: const Duration(seconds: 1)),
+                    );
+                  },
+                ),
+                const SizedBox(width: 12),
                 _filterChip(context, 'All'),
                 const SizedBox(width: 8),
                 _filterChip(context, 'Consultations'),
@@ -52,7 +65,7 @@ class _HealthTimelinePageState extends ConsumerState<HealthTimelinePage> {
             child: timelineState.when(
               loading: () => Center(child: CircularProgressIndicator(color: t.brandPrimary)),
               error: (err, stack) => Center(
-                child: Text('Error loading timeline: $err', style: TextStyle(color: t.textSecondary)),
+                child: Text('${tr('patient_err_loading_timeline')}: $err', style: TextStyle(color: t.textSecondary)),
               ),
               data: (events) {
                 // Apply Filter
@@ -72,7 +85,7 @@ class _HealthTimelinePageState extends ConsumerState<HealthTimelinePage> {
                         Icon(Icons.history_toggle_off_rounded, size: 48, color: t.textSecondary.withValues(alpha: 0.5)),
                         const SizedBox(height: 16),
                         Text(
-                          'No matching health events found.',
+                          tr('patient_no_matching_events'),
                           style: GoogleFonts.inter(color: t.textSecondary),
                         ),
                       ],
@@ -123,7 +136,14 @@ class _HealthTimelinePageState extends ConsumerState<HealthTimelinePage> {
 
   Widget _filterChip(BuildContext context, String label) {
     final t = AppColors.of(context);
+    final tr = ref.watch(translationsProvider);
     final selected = _activeFilter == label;
+    const labelKeys = {
+      'All': 'patient_filter_all',
+      'Consultations': 'patient_filter_consultations',
+      'Lab Tests': 'patient_filter_lab_tests',
+      'Imaging': 'patient_filter_imaging',
+    };
     return InkWell(
       onTap: () {
         setState(() {
@@ -139,7 +159,7 @@ class _HealthTimelinePageState extends ConsumerState<HealthTimelinePage> {
           border: Border.all(color: selected ? t.brandPrimary : t.border),
         ),
         child: Text(
-          label,
+          tr(labelKeys[label] ?? label),
           style: GoogleFonts.inter(
             fontSize: 13,
             fontWeight: FontWeight.w500,

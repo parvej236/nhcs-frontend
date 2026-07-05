@@ -6,6 +6,7 @@ import '../models/health_event.dart';
 import '../models/medical_record.dart';
 import '../models/patient_profile.dart';
 import '../models/ai_suggestion.dart';
+import '../models/copilot_models.dart';
 
 abstract class PatientRepository {
   Future<DashboardSummary> getDashboardSummary(String healthId);
@@ -27,6 +28,12 @@ abstract class PatientRepository {
   Future<List<ImagingReport>> getImagingReports(String healthId);
   Future<void> cancelAppointment(String appointmentId);
   Future<AiSuggestionResponse> getAiDoctorSuggestion(String healthId, String problemText);
+  // AI Health Copilot
+  Future<CopilotBriefing> getCopilotBriefing();
+  Future<String> copilotChat(String message, List<ChatMessage> history);
+  Future<MedicationCheck> getMedicationCheck({String? newMedicine});
+  Future<RiskRadar> getRiskRadar();
+  Future<ReportExplanation> explainReport({required String reportType, required String reportId});
   Future<Map<String, dynamic>> getBloodDonationStatus();
   Future<Map<String, dynamic>> toggleBloodDonorStatus();
   Future<void> acceptBloodRequest(String id);
@@ -198,6 +205,48 @@ class PatientRepositoryImpl implements PatientRepository {
       data: {'problemText': problemText},
     );
     return AiSuggestionResponse.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  @override
+  Future<CopilotBriefing> getCopilotBriefing() async {
+    final response = await dio.get(ApiEndpoints.copilotBriefing);
+    return CopilotBriefing.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  @override
+  Future<String> copilotChat(String message, List<ChatMessage> history) async {
+    final response = await dio.post(
+      ApiEndpoints.copilotChat,
+      data: {
+        'message': message,
+        'history': history.map((e) => e.toJson()).toList(),
+      },
+    );
+    return (response.data as Map<String, dynamic>)['reply']?.toString() ?? '';
+  }
+
+  @override
+  Future<MedicationCheck> getMedicationCheck({String? newMedicine}) async {
+    final response = await dio.post(
+      ApiEndpoints.copilotMedicationCheck,
+      data: {if (newMedicine != null && newMedicine.isNotEmpty) 'newMedicine': newMedicine},
+    );
+    return MedicationCheck.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  @override
+  Future<RiskRadar> getRiskRadar() async {
+    final response = await dio.get(ApiEndpoints.copilotRisk);
+    return RiskRadar.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  @override
+  Future<ReportExplanation> explainReport({required String reportType, required String reportId}) async {
+    final response = await dio.post(
+      ApiEndpoints.copilotExplainReport,
+      data: {'reportType': reportType, 'reportId': reportId},
+    );
+    return ReportExplanation.fromJson(response.data as Map<String, dynamic>);
   }
 
   @override

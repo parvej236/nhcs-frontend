@@ -2,21 +2,41 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/providers/language_provider.dart';
 import '../../../core/widgets/ai_insight_panel.dart';
 import '../../../core/widgets/notification_dropdown.dart';
 import '../../../core/providers/notifications_provider.dart';
+import '../../../core/providers/doctor_queue_provider.dart';
 import '../presentation/providers/doctor_providers.dart';
 import '../presentation/providers/clinical_workspace_provider.dart';
 import '../data/models/patient_queue_item.dart';
+import '../../../core/widgets/shimmer.dart';
 
 class DoctorDashboardPage extends ConsumerWidget {
   const DoctorDashboardPage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final tr = ref.watch(translationsProvider);
     final dashboardAsync = ref.watch(doctorDashboardProvider);
-    final queueAsync = ref.watch(patientQueueProvider);
+    final queue = ref.watch(doctorQueueProvider);
     final notifications = ref.watch(doctorNotificationsProvider);
+    final profileAsync = ref.watch(doctorProfileProvider);
+    final queueAsync = ref.watch(patientQueueProvider);
+
+    // Sync database appointments queue to doctorQueueProvider
+    ref.listen<AsyncValue<List<PatientQueueItem>>>(patientQueueProvider, (prev, next) {
+      if (next.hasValue) {
+        ref.read(doctorQueueProvider.notifier).setQueue(next.value!);
+      }
+    });
+
+    // Handle initial load sync if already resolved
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (queueAsync.hasValue && ref.read(doctorQueueProvider).isEmpty) {
+        ref.read(doctorQueueProvider.notifier).setQueue(queueAsync.value!);
+      }
+    });
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -34,11 +54,33 @@ class DoctorDashboardPage extends ConsumerWidget {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Good Morning, Dr. Ahmed', style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.bold)),
-                    Text('Cardiology Department • Dhaka Central Hospital', style: GoogleFonts.inter(color: AppColors.textSecondary, fontSize: 13)),
+                    profileAsync.when(
+                      data: (profile) => Text('${profile['fullName'] ?? 'Dr. Rahim Chowdhury'}', style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.bold)),
+                      loading: () => Text(tr('doctor_dashboard_title'), style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.bold)),
+                      error: (_, __) => Text('Dr. Rahim Chowdhury', style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.bold)),
+                    ),
+                    profileAsync.when(
+                      data: (profile) => Text('${profile['specialization'] ?? 'Cardiology'} Department • ${profile['hospitalAffiliation'] ?? 'Dhaka Medical College Hospital'}', style: GoogleFonts.inter(color: AppColors.textSecondary, fontSize: 13)),
+                      loading: () => Text(tr('doctor_loading_department'), style: GoogleFonts.inter(color: AppColors.textSecondary, fontSize: 13)),
+                      error: (_, __) => Text('Cardiology Department • Dhaka Medical College Hospital', style: GoogleFonts.inter(color: AppColors.textSecondary, fontSize: 13)),
+                    ),
                   ],
                 ),
                 const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.refresh_rounded, color: AppColors.primary),
+                  tooltip: tr('doctor_reload_dashboard'),
+                  onPressed: () {
+                    ref.invalidate(doctorDashboardProvider);
+                    ref.invalidate(doctorNotificationsProvider);
+                    ref.invalidate(doctorProfileProvider);
+                    ref.invalidate(patientQueueProvider);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(tr('doctor_dashboard_reloaded')), duration: const Duration(seconds: 1)),
+                    );
+                  },
+                ),
+                const SizedBox(width: 8),
                 NotificationDropdown(
                   notifications: notifications,
                   onMarkRead: (id) => ref.read(doctorNotificationsProvider.notifier).markAsRead(id),
@@ -52,7 +94,7 @@ class DoctorDashboardPage extends ConsumerWidget {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(colors: [AppColors.secondary, Color(0xFF0EA5E9)]),
+                    gradient: const LinearGradient(colors: [AppColors.secondary, AppColors.primaryDark]),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: const Icon(Icons.person_rounded, color: Colors.white, size: 22),
@@ -75,33 +117,57 @@ class DoctorDashboardPage extends ConsumerWidget {
                         // Stats Row
                         Row(
                           children: [
-                            _statCard('Today\'s Patients', summary.totalAppointments.toString(), Icons.people_rounded, AppColors.primary, '+2 vs yesterday'),
+                            _statCard(tr('doctor_stat_todays_patients'), summary.totalAppointments.toString(), Icons.people_rounded, AppColors.primary, tr('doctor_stat_todays_patients_sub')),
                             const SizedBox(width: 16),
-                            _statCard('Follow-ups', summary.totalFollowUps.toString(), Icons.replay_rounded, AppColors.secondary, '2 scheduled'),
+                            _statCard(tr('doctor_stat_followups'), summary.totalFollowUps.toString(), Icons.replay_rounded, AppColors.secondary, tr('doctor_stat_followups_sub')),
                             const SizedBox(width: 16),
-                            _statCard('Emergency', summary.emergencyCases.toString(), Icons.emergency_rounded, AppColors.danger, 'Action required'),
+                            _statCard(tr('doctor_stat_emergency'), summary.emergencyCases.toString(), Icons.emergency_rounded, AppColors.danger, tr('doctor_stat_emergency_sub')),
                             const SizedBox(width: 16),
-                            _statCard('Pending Reports', summary.pendingReports.toString(), Icons.science_rounded, AppColors.warning, '3 unread'),
+                            _statCard(tr('doctor_stat_pending_reports'), summary.pendingReports.toString(), Icons.science_rounded, AppColors.warning, tr('doctor_stat_pending_reports_sub')),
                           ],
                         ),
                         const SizedBox(height: 24),
                         AiInsightPanel(
-                          title: 'AI Daily Briefing & Patient Summary',
+                          title: tr('doctor_ai_daily_briefing_title'),
                           description: summary.aiBriefing,
                           type: 'success',
-                          recommendations: const [
-                            'Check-in on Emergency consult Patient: Fatema Zohra immediately.',
-                            'Verify pending CBC lab report for Rahim Islam.',
-                            'Prepare weekly clinical shift roster update for approval.'
+                          recommendations: [
+                            tr('doctor_ai_briefing_rec1'),
+                            tr('doctor_ai_briefing_rec2'),
+                            tr('doctor_ai_briefing_rec3'),
                           ],
                         ),
                       ],
                     ),
-                    loading: () => const Center(child: Padding(
-                      padding: EdgeInsets.all(20.0),
-                      child: CircularProgressIndicator(),
-                    )),
-                    error: (err, _) => Text('Error loading summary: $err'),
+                    loading: () => Shimmer(
+                      child: Container(
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: AppColors.surface,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppColors.divider.withOpacity(0.15)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const ShimmerBox.circle(size: 32),
+                                const SizedBox(width: 12),
+                                const ShimmerBox(width: 180, height: 18),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            const ShimmerBox(width: double.infinity, height: 14),
+                            const SizedBox(height: 8),
+                            const ShimmerBox(width: double.infinity, height: 14),
+                            const SizedBox(height: 8),
+                            const ShimmerBox(width: 250, height: 14),
+                          ],
+                        ),
+                      ),
+                    ),
+                    error: (err, _) => Text('${tr('doctor_error_loading_summary')} $err'),
                   ),
                   
                   const SizedBox(height: 24),
@@ -110,38 +176,51 @@ class DoctorDashboardPage extends ConsumerWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Patient Queue — Today', style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w600)),
-                      queueAsync.when(
-                        data: (queue) {
+                      Text(tr('doctor_patient_queue_today'), style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w600)),
+                      if (queue.isNotEmpty)
+                        Builder(builder: (context) {
                           final waitingCount = queue.where((p) => p.visitType != 'Emergency').length;
                           return Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                             decoration: BoxDecoration(color: AppColors.successLight, borderRadius: BorderRadius.circular(8)),
-                            child: Text('$waitingCount waiting • 1 active', style: GoogleFonts.inter(color: AppColors.success, fontSize: 12, fontWeight: FontWeight.w600)),
+                            child: Text('$waitingCount ${tr('doctor_waiting_count_suffix')}', style: GoogleFonts.inter(color: AppColors.success, fontSize: 12, fontWeight: FontWeight.w600)),
                           );
-                        },
-                        loading: () => const SizedBox(),
-                        error: (_, __) => const SizedBox(),
-                      ),
+                        }),
                     ],
                   ),
                   const SizedBox(height: 16),
-                  
+
                   // Patient Queue List
-                  queueAsync.when(
-                    data: (queue) => ListView.separated(
+                  if (queue.isEmpty)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppColors.divider.withOpacity(0.5)),
+                      ),
+                      child: Column(
+                        children: [
+                          const Icon(Icons.event_available_rounded, size: 40, color: AppColors.textMuted),
+                          const SizedBox(height: 12),
+                          Text(tr('doctor_queue_empty_title'), style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+                          const SizedBox(height: 4),
+                          Text(tr('doctor_queue_empty_desc'), textAlign: TextAlign.center, style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted)),
+                        ],
+                      ),
+                    )
+                  else
+                    ListView.separated(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       itemCount: queue.length,
                       separatorBuilder: (context, index) => const SizedBox(height: 12),
                       itemBuilder: (context, index) {
                         final item = queue[index];
-                        return _queueCard(context, ref, item);
+                        return _queueCard(context, ref, item, index == 0);
                       },
                     ),
-                    loading: () => const Center(child: CircularProgressIndicator()),
-                    error: (err, _) => Text('Error loading queue: $err'),
-                  ),
                 ],
               ),
             ),
@@ -206,10 +285,10 @@ class DoctorDashboardPage extends ConsumerWidget {
     );
   }
 
-  Widget _queueCard(BuildContext context, WidgetRef ref, PatientQueueItem item) {
-    final bool isActive = item.visitType == 'Follow-up' && item.name == 'Rahim Islam'; // Highlight first patient
+  Widget _queueCard(BuildContext context, WidgetRef ref, PatientQueueItem item, bool isActive) {
+    final tr = ref.watch(translationsProvider);
     final Color statusColor = isActive ? AppColors.info : AppColors.warning;
-    final String statusText = isActive ? 'IN CONSULTATION' : 'WAITING';
+    final String statusText = isActive ? tr('doctor_status_in_consultation') : tr('doctor_status_waiting');
 
     Color riskColor = item.riskIndicator == 'Emergency' 
         ? AppColors.danger 
@@ -311,7 +390,7 @@ class DoctorDashboardPage extends ConsumerWidget {
               elevation: 0,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
-            child: Text(isActive ? 'Continue' : 'Start', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
+            child: Text(isActive ? tr('doctor_btn_continue') : tr('doctor_btn_start'), style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
           ),
         ],
       ),

@@ -5,16 +5,18 @@ import '../models/doctor_dashboard_summary.dart';
 import '../models/patient_queue_item.dart';
 import '../models/report_review_item.dart';
 import '../models/clinical_case.dart';
+import '../models/schedule_slot.dart';
 
 abstract class DoctorRepository {
   Future<DoctorDashboardSummary> getDashboardSummary();
   Future<List<PatientQueueItem>> getPatientQueue();
   Future<List<ReportReviewItem>> getPendingReports();
-  Future<List<String>> getScheduleSlots(String day);
+  Future<List<ScheduleSlot>> getScheduleSlots(String day);
   Future<void> submitTreatmentPlan(TreatmentPlan plan);
   Future<PatientProfile?> getPatientProfileByHealthId(String healthId);
   Future<void> reviewReport(String reportId);
   Future<String> getAiBriefing(String appointmentId);
+  Future<Map<String, dynamic>> updateDoctorProfile(Map<String, dynamic> data);
 }
 
 class DoctorRepositoryImpl implements DoctorRepository {
@@ -28,13 +30,24 @@ class DoctorRepositoryImpl implements DoctorRepository {
     try {
       final queue = await getPatientQueue();
       final reports = await getPendingReports();
+      
+      final total = queue.length;
+      final followups = queue.where((p) => p.visitType == 'Follow-up').length;
+      final emergencies = queue.where((p) => p.riskIndicator == 'Emergency').length;
+      final pendingReportsCount = reports.length;
+      
+      String aiBriefing = "Today you have $total consultations, including $followups follow-up visits, and $emergencies emergency cases currently checked in.";
+      if (queue.isNotEmpty) {
+        aiBriefing += " Your next checked-in patient is ${queue.first.name}, scheduled at ${queue.first.time}.";
+      }
+      
       return DoctorDashboardSummary(
-        totalAppointments: queue.length,
-        totalFollowUps: queue.where((p) => p.visitType == 'Follow-up').length,
-        emergencyCases: queue.where((p) => p.riskIndicator == 'Emergency').length,
-        pendingReports: reports.length,
-        referredCases: 0,
-        aiBriefing: 'System operates under normal clinic volume.',
+        totalAppointments: total,
+        totalFollowUps: followups,
+        emergencyCases: emergencies,
+        pendingReports: pendingReportsCount,
+        referredCases: queue.where((p) => p.visitType == 'Referral').length,
+        aiBriefing: aiBriefing,
       );
     } catch (e) {
       return _datasource.dashboardSummary;
@@ -57,6 +70,8 @@ class DoctorRepositoryImpl implements DoctorRepository {
         final bp = '${item['bpSystolic'] ?? '120'}/${item['bpDiastolic'] ?? '80'}';
         final glucose = item['bloodGlucose']?.toString() ?? '95';
         final timeSlot = item['timeSlot']?.toString() ?? '10:00 AM';
+        final riskIndicator = item['riskIndicator']?.toString() ?? 'Low';
+        final visitType = item['visitType']?.toString() ?? 'Consultation';
 
         return PatientQueueItem(
           id: id,
@@ -64,8 +79,8 @@ class DoctorRepositoryImpl implements DoctorRepository {
           age: age,
           gender: gender,
           existingDiseases: [item['patientBloodGroup']?.toString() ?? 'O+'],
-          riskIndicator: 'Normal',
-          visitType: 'Consultation',
+          riskIndicator: riskIndicator,
+          visitType: visitType,
           time: timeSlot,
           healthId: healthId,
         );
@@ -78,39 +93,64 @@ class DoctorRepositoryImpl implements DoctorRepository {
   @override
   Future<List<ReportReviewItem>> getPendingReports() async {
     try {
-      // Return mock report reviews for demonstration
-      return _datasource.pendingReports;
+      final response = await dio.get('/doctors/reports/pending');
+      final data = response.data as List<dynamic>;
+      return data.map((item) => ReportReviewItem.fromJson(item as Map<String, dynamic>)).toList();
     } catch (e) {
       return _datasource.pendingReports;
     }
   }
 
   @override
-  Future<List<String>> getScheduleSlots(String day) async {
-    return _datasource.scheduleSlots[day] ?? [];
+  Future<List<ScheduleSlot>> getScheduleSlots(String day) async {
+    // Fetch the doctor's real appointments and keep only the ones falling on
+    // the requested weekday. No dummy fallback — an empty schedule stays empty.
+    final response = await dio.get('/doctors/schedule');
+    final data = response.data as List<dynamic>;
+    final target = day.toUpperCase();
+    return data
+        .map((item) => ScheduleSlot.fromJson(item as Map<String, dynamic>))
+        .where((slot) => slot.dayOfWeek.toUpperCase() == target)
+        .toList();
   }
 
   @override
   Future<void> submitTreatmentPlan(TreatmentPlan plan) async {
-    // 1. Submit prescription
-    final prescriptionPayload = {
-      'diagnosis': plan.diagnoses.map((d) => d.diseaseName).join(', '),
-      'clinicalNotes': plan.clinicalNotes,
-      'followUpDate': plan.followUp,
-      'medicines': plan.medicines.map((m) => {
-        'name': m.medicineName,
-        'dosage': m.dosage,
-        'instruction': m.instructions,
-        'duration': m.duration,
-      }).toList(),
-    };
+    // Everything is keyed on the patient's Unified Health ID (NUD-000-<id>) so
+    // it persists against the REAL patient being treated — regardless of whether
+    // the consultation started from the live queue or a health-ID search. The
+    // records land in that patient's Medical Vault and the hospital lab queue.
+    final healthId = plan.patientId;
+    if (healthId.isEmpty) {
+      throw Exception('No patient selected — cannot submit treatment.');
+    }
 
-    await dio.post('/doctors/appointments/${plan.appointmentId}/prescribe', data: prescriptionPayload);
+    // 1. Prescription — only raised when there is an actual diagnosis or at least
+    //    one prescribed medicine, so we never persist an empty prescription card.
+    final hasDiagnosis = plan.diagnoses.isNotEmpty;
+    final hasMedicines = plan.medicines.isNotEmpty;
+    if (hasDiagnosis || hasMedicines) {
+      final prescriptionPayload = {
+        'diagnosis': plan.diagnoses.map((d) => d.diseaseName).join(', '),
+        'clinicalNotes': plan.clinicalNotes,
+        'followUpDate': plan.followUp,
+        'medicines': plan.medicines.map((m) => {
+          'name': m.medicineName,
+          'dosage': m.dosage,
+          'instruction': m.instructions,
+          'duration': m.duration,
+        }).toList(),
+      };
+      await dio.post('/doctors/patients/$healthId/prescribe', data: prescriptionPayload);
+    }
 
-    // 2. Submit lab orders
+    // 2. Lab-test requests — one persisted order per selected investigation.
     for (final test in plan.investigations) {
-      final category = test.toLowerCase().contains('blood') || test.toLowerCase().contains('cbc') ? 'Haematology' : 'Biochemistry';
-      await dio.post('/doctors/appointments/${plan.appointmentId}/lab-order', data: {
+      final lower = test.toLowerCase();
+      final category = lower.contains('blood') || lower.contains('cbc') || lower.contains('glucose') || lower.contains('hba1c')
+          ? 'Haematology'
+          : 'Biochemistry';
+      await dio.post('/doctors/patients/$healthId/lab-order', data: {
         'testName': test,
         'category': category,
       });
@@ -119,100 +159,15 @@ class DoctorRepositoryImpl implements DoctorRepository {
 
   @override
   Future<PatientProfile?> getPatientProfileByHealthId(String healthId) async {
+    // Load the REAL patient by their Unified Health ID from the backend. No dummy
+    // fallback — if the ID is unknown we return null so the UI shows "not found"
+    // instead of another patient's data.
     try {
-      // Since all patient details are embedded in the checked-in active appointment,
-      // we can fetch the active queue and retrieve it directly to avoid extra backend queries!
-      final queue = await dio.get('/doctors/appointments/active');
-      final list = queue.data as List<dynamic>;
-      
-      final match = list.firstWhere(
-        (e) => e['patientHealthId']?.toString() == healthId,
-        orElse: () => null,
-      );
-
-      if (match != null) {
-        final idStr = match['patient']?['id']?.toString() ?? '1';
-        final id = int.tryParse(idStr) ?? 1;
-        final name = match['patientName']?.toString() ?? 'Rahim Islam';
-        final ageStr = match['patientAge']?.toString() ?? '40';
-        final age = int.tryParse(ageStr) ?? 40;
-        final gender = match['patientGender']?.toString() ?? 'Male';
-        final bpSystolic = match['bpSystolic']?.toString() ?? '120';
-        final bpDiastolic = match['bpDiastolic']?.toString() ?? '80';
-        final bloodGlucose = match['bloodGlucose']?.toString() ?? '95';
-        final heartRate = match['heartRate']?.toString() ?? '75';
-        final weight = match['weight']?.toString() ?? '70';
-
-        // Parse allergies from patient json
-        final List<dynamic> allergiesJson = match['patient']?['allergies'] as List<dynamic>? ?? [];
-        final allergies = allergiesJson.map((e) => Allergy(
-          allergen: e['allergen']?.toString() ?? '',
-          severity: e['severity']?.toString() ?? 'Mild',
-          reaction: e['reaction']?.toString() ?? '',
-        )).toList();
-
-        // Parse chronic diseases
-        final List<dynamic> chronicJson = match['patient']?['chronicDiseases'] as List<dynamic>? ?? [];
-        final chronicDiseases = chronicJson.map((e) => ChronicDisease(
-          diseaseName: e['diseaseName']?.toString() ?? '',
-          status: e['status']?.toString() ?? 'Active',
-          diagnosedDate: DateTime.now(),
-        )).toList();
-
-        return PatientProfile(
-          healthId: healthId,
-          name: name,
-          dateOfBirth: DateTime.now().subtract(Duration(days: age * 365)),
-          gender: gender,
-          bloodGroup: match['patientBloodGroup']?.toString() ?? 'O+',
-          nationalId: match['patient']?['nationalId']?.toString() ?? '8210398457',
-          phone: match['patient']?['contactNumber']?.toString() ?? '+880 1555-555555',
-          occupation: match['patient']?['occupation']?.toString() ?? 'Service',
-          maritalStatus: match['patient']?['maritalStatus']?.toString() ?? 'Married',
-          presentAddress: match['patient']?['presentAddress']?.toString() ?? 'Dhaka, Bangladesh',
-          permanentAddress: match['patient']?['permanentAddress']?.toString() ?? 'Dhaka, Bangladesh',
-          emergencyContacts: [],
-          allergies: allergies,
-          chronicDiseases: chronicDiseases,
-          vitals: VitalSign(
-            bpSystolic: bpSystolic,
-            bpDiastolic: bpDiastolic,
-            bloodGlucose: bloodGlucose,
-            heartRate: heartRate,
-            weight: weight,
-            lastUpdated: DateTime.now(),
-          ),
-        );
-      }
+      final response = await dio.get('/patients/$healthId/profile');
+      return PatientProfile.fromJson(response.data as Map<String, dynamic>);
     } catch (e) {
-      // Fallback
+      return null;
     }
-
-    // Default mock fallback to prevent crash
-    return PatientProfile(
-      healthId: healthId,
-      name: 'Rahim Islam',
-      dateOfBirth: DateTime.now().subtract(const Duration(days: 40 * 365)),
-      gender: 'Male',
-      bloodGroup: 'O+',
-      nationalId: '8210398457',
-      phone: '+880 1555-555555',
-      occupation: 'Service',
-      maritalStatus: 'Married',
-      presentAddress: 'Dhaka, Bangladesh',
-      permanentAddress: 'Dhaka, Bangladesh',
-      emergencyContacts: [],
-      allergies: [],
-      chronicDiseases: [],
-      vitals: VitalSign(
-        bpSystolic: '120',
-        bpDiastolic: '80',
-        bloodGlucose: '95',
-        heartRate: '75',
-        weight: '70',
-        lastUpdated: DateTime.now(),
-      ),
-    );
   }
 
   @override
@@ -225,5 +180,11 @@ class DoctorRepositoryImpl implements DoctorRepository {
   Future<String> getAiBriefing(String appointmentId) async {
     final response = await dio.post('/doctors/appointments/$appointmentId/ai-briefing');
     return response.data['briefing']?.toString() ?? 'Clinical briefing generation failed.';
+  }
+
+  @override
+  Future<Map<String, dynamic>> updateDoctorProfile(Map<String, dynamic> data) async {
+    final response = await dio.put('/doctors/profile', data: data);
+    return response.data as Map<String, dynamic>;
   }
 }

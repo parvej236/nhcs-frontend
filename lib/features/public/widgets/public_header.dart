@@ -2,21 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/providers/theme_provider.dart';
+// import '../../../core/providers/theme_provider.dart';
+import '../../../core/providers/language_provider.dart';
+import '../../../core/l10n/app_language.dart';
 
-/// A public marketing-site navigation item (anchor-scroll target).
+/// A public marketing-site navigation item (anchor-scroll target). [labelKey]
+/// is a translation key resolved against the active language at build time.
 class PublicNavItem {
   final String id;
-  final String label;
-  const PublicNavItem(this.id, this.label);
+  final String labelKey;
+  const PublicNavItem(this.id, this.labelKey);
 }
 
 const publicNavItems = <PublicNavItem>[
-  PublicNavItem('home', 'Home'),
-  PublicNavItem('vitals', 'Risk Analyzer'),
-  PublicNavItem('queue', 'Specialists & Queue'),
-  PublicNavItem('blood', 'Emergency Blood'),
-  PublicNavItem('blog', 'Health Blog'),
+  PublicNavItem('home', 'nav_home'),
+  PublicNavItem('vitals', 'nav_vitals'),
+  PublicNavItem('queue', 'nav_queue'),
+  PublicNavItem('blood', 'nav_blood'),
+  PublicNavItem('blog', 'nav_blog'),
 ];
 
 /// Sticky top navigation for the public site. Mirrors chrome.jsx
@@ -37,8 +40,9 @@ class PublicHeader extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppColors.of(context);
-    final themeMode = ref.watch(themeModeProvider);
-    final isDark = themeMode == ThemeMode.dark;
+    // final themeMode = ref.watch(themeModeProvider);
+    final tr = ref.watch(translationsProvider);
+    // final isDark = themeMode == ThemeMode.dark;
     final showNav = MediaQuery.of(context).size.width > 1080;
 
     return Container(
@@ -76,14 +80,18 @@ class PublicHeader extends ConsumerWidget {
               children: [
                 for (final item in publicNavItems)
                   _NavLink(
-                    label: item.label,
+                    label: tr(item.labelKey),
                     active: activeId == item.id,
                     onTap: () => onNavTap(item.id),
                   ),
               ],
             ),
           const Spacer(),
-          // Theme toggle
+          // Language switcher (sits right beside the theme toggle)
+          const LanguageSwitcher(),
+          /*
+          const SizedBox(width: 12),
+          // Theme toggle (Commented out for future implementation)
           InkWell(
             onTap: () => ref.read(themeModeProvider.notifier).toggle(),
             borderRadius: BorderRadius.circular(24),
@@ -101,13 +109,92 @@ class PublicHeader extends ConsumerWidget {
               ),
             ),
           ),
+          */
           const SizedBox(width: 16),
           // Login Portal
           ElevatedButton(
             onPressed: onLogin,
-            child: const Text('Login Portal'),
+            child: Text(tr('login_portal')),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// A compact language switcher pill designed to sit beside the theme toggle.
+///
+/// Tapping opens a menu of every [AppLanguage]; the choice is applied globally
+/// and persisted immediately via [languageProvider]. Reusable anywhere in the
+/// app (not just the public header).
+class LanguageSwitcher extends ConsumerWidget {
+  const LanguageSwitcher({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final t = AppColors.of(context);
+    final current = ref.watch(languageProvider);
+
+    return PopupMenuButton<AppLanguage>(
+      tooltip: ref.watch(translationsProvider)('language'),
+      onSelected: (lang) =>
+          ref.read(languageProvider.notifier).setLanguage(lang),
+      offset: const Offset(0, 48),
+      color: t.bgCard,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: t.border),
+      ),
+      itemBuilder: (context) => [
+        for (final lang in AppLanguage.values)
+          PopupMenuItem<AppLanguage>(
+            value: lang,
+            child: Row(
+              children: [
+                Icon(
+                  lang == current
+                      ? Icons.radio_button_checked
+                      : Icons.radio_button_unchecked,
+                  size: 18,
+                  color: lang == current ? t.brandPrimary : t.textSecondary,
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  lang.label,
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight:
+                        lang == current ? FontWeight.w700 : FontWeight.w500,
+                    color: lang == current ? t.brandPrimary : t.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: t.bgInput,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: t.border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.translate, color: t.brandPrimary, size: 16),
+            const SizedBox(width: 6),
+            Text(
+              current.short,
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: t.brandPrimary,
+              ),
+            ),
+            Icon(Icons.arrow_drop_down, color: t.textSecondary, size: 18),
+          ],
+        ),
       ),
     );
   }

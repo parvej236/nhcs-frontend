@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/providers/language_provider.dart';
 import '../data/models/bed_allocation.dart';
 import '../presentation/providers/hospital_providers.dart';
 
@@ -16,16 +17,18 @@ class _BedManagementPageState extends ConsumerState<BedManagementPage> {
   String _selectedWard = 'General Ward (Male)';
 
   void _admitPatient(String bedId, String patientName, String healthId, String doctor) {
+    final tr = ref.read(translationsProvider);
     ref.read(bedCapacityProvider.notifier).admitPatient(bedId, patientName, healthId, doctor);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Patient $patientName admitted successfully.'),
+        content: Text('${tr('hospital_bed_patient')} $patientName ${tr('hospital_bed_admitted_success')}'),
         backgroundColor: AppColors.success,
       ),
     );
   }
 
   void _dischargePatient(String bedId, String patientName, String bedNumber) {
+    final tr = ref.read(translationsProvider);
     final diagCont = TextEditingController();
     final summaryCont = TextEditingController();
 
@@ -33,36 +36,36 @@ class _BedManagementPageState extends ConsumerState<BedManagementPage> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text('Discharge Patient ($patientName)', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+          title: Text('${tr('hospital_bed_discharge_patient')} ($patientName)', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               TextField(
                 controller: diagCont,
-                decoration: const InputDecoration(labelText: 'Final Diagnosis', hintText: 'e.g., Acute Myocardial Infarction'),
+                decoration: InputDecoration(labelText: tr('hospital_bed_final_diagnosis'), hintText: 'e.g., Acute Myocardial Infarction'),
               ),
               const SizedBox(height: 16),
               TextField(
                 controller: summaryCont,
                 maxLines: 3,
-                decoration: const InputDecoration(labelText: 'Discharge Summary Notes', hintText: 'Patient is stable. Prescribed meds...'),
+                decoration: InputDecoration(labelText: tr('hospital_bed_discharge_summary'), hintText: tr('hospital_bed_discharge_summary_hint')),
               ),
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            TextButton(onPressed: () => Navigator.pop(context), child: Text(tr('hospital_bed_cancel'))),
             ElevatedButton(
               onPressed: () {
                 ref.read(bedCapacityProvider.notifier).dischargePatient(bedId);
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('Patient discharged. $bedNumber is now available.'),
+                    content: Text('${tr('hospital_bed_patient_discharged')} $bedNumber ${tr('hospital_bed_now_available')}'),
                     backgroundColor: AppColors.success,
                   ),
                 );
               },
-              child: const Text('Confirm Discharge'),
+              child: Text(tr('hospital_bed_confirm_discharge')),
             ),
           ],
         );
@@ -71,6 +74,7 @@ class _BedManagementPageState extends ConsumerState<BedManagementPage> {
   }
 
   void _showAdmitDialog(BedAllocation bed) {
+    final tr = ref.read(translationsProvider);
     final nameCont = TextEditingController();
     final idCont = TextEditingController();
     String doctor = 'Dr. Ahmed Khan';
@@ -81,23 +85,23 @@ class _BedManagementPageState extends ConsumerState<BedManagementPage> {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              title: Text('Admit to ${bed.number} (${bed.ward})', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+              title: Text('${tr('hospital_bed_admit_to')} ${bed.number} (${bed.ward})', style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   TextField(
                     controller: idCont,
-                    decoration: const InputDecoration(labelText: 'Digital Health ID', hintText: 'NUD-892-441-X7'),
+                    decoration: InputDecoration(labelText: tr('hospital_bed_digital_health_id'), hintText: 'NUD-892-441-X7'),
                   ),
                   const SizedBox(height: 16),
                   TextField(
                     controller: nameCont,
-                    decoration: const InputDecoration(labelText: 'Patient Name', hintText: 'Rahim Islam'),
+                    decoration: InputDecoration(labelText: tr('hospital_bed_patient_name'), hintText: 'Rahim Islam'),
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
                     value: doctor,
-                    decoration: const InputDecoration(labelText: 'Attending Physician'),
+                    decoration: InputDecoration(labelText: tr('hospital_bed_attending_physician')),
                     onChanged: (val) => setDialogState(() => doctor = val!),
                     items: ['Dr. Ahmed Khan', 'Dr. Subrata Sen', 'Dr. Fatima', 'Trauma Lead']
                         .map((d) => DropdownMenuItem(value: d, child: Text(d)))
@@ -106,7 +110,7 @@ class _BedManagementPageState extends ConsumerState<BedManagementPage> {
                 ],
               ),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+                TextButton(onPressed: () => Navigator.pop(context), child: Text(tr('hospital_bed_cancel'))),
                 ElevatedButton(
                   onPressed: () {
                     if (nameCont.text.isNotEmpty && idCont.text.isNotEmpty) {
@@ -114,7 +118,7 @@ class _BedManagementPageState extends ConsumerState<BedManagementPage> {
                       Navigator.pop(context);
                     }
                   },
-                  child: const Text('Admit Patient'),
+                  child: Text(tr('hospital_bed_admit_patient')),
                 ),
               ],
             );
@@ -126,6 +130,7 @@ class _BedManagementPageState extends ConsumerState<BedManagementPage> {
 
   @override
   Widget build(BuildContext context) {
+    final tr = ref.watch(translationsProvider);
     final bedsList = ref.watch(bedCapacityProvider);
     final activeAdmissions = bedsList.where((b) => b.status == 'Occupied').toList();
 
@@ -142,13 +147,29 @@ class _BedManagementPageState extends ConsumerState<BedManagementPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Bed Capacity Management',
-                    style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.bold),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          tr('hospital_bed_capacity_management'),
+                          style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.refresh_rounded, color: AppColors.primary),
+                        tooltip: tr('hospital_bed_reload'),
+                        onPressed: () {
+                          ref.invalidate(bedCapacityProvider);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(tr('hospital_bed_reloaded')), duration: const Duration(seconds: 1)),
+                          );
+                        },
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Click on any bed slot to admit a patient or manage occupancy.',
+                    tr('hospital_bed_subtitle'),
                     style: GoogleFonts.inter(color: AppColors.textSecondary, fontSize: 13),
                   ),
                   const SizedBox(height: 24),
@@ -170,12 +191,12 @@ class _BedManagementPageState extends ConsumerState<BedManagementPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Active Admissions',
+                    tr('hospital_bed_active_admissions'),
                     style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 16),
                   activeAdmissions.isEmpty
-                      ? Center(child: Text('No patients currently admitted.', style: GoogleFonts.inter(color: AppColors.textSecondary)))
+                      ? Center(child: Text(tr('hospital_bed_no_patients'), style: GoogleFonts.inter(color: AppColors.textSecondary)))
                       : ListView.separated(
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
@@ -195,6 +216,20 @@ class _BedManagementPageState extends ConsumerState<BedManagementPage> {
     );
   }
 
+  String _wardLabel(String ward) {
+    final tr = ref.watch(translationsProvider);
+    switch (ward) {
+      case 'General Ward (Male)':
+        return tr('hospital_bed_ward_general_male');
+      case 'General Ward (Female)':
+        return tr('hospital_bed_ward_general_female');
+      case 'ICU':
+        return tr('hospital_bed_ward_icu');
+      default:
+        return ward;
+    }
+  }
+
   Widget _buildWardTabs() {
     final wards = ['General Ward (Male)', 'General Ward (Female)', 'ICU'];
     return Row(
@@ -203,7 +238,7 @@ class _BedManagementPageState extends ConsumerState<BedManagementPage> {
         return Padding(
           padding: const EdgeInsets.only(right: 12),
           child: ChoiceChip(
-            label: Text(w),
+            label: Text(_wardLabel(w)),
             selected: isSelected,
             onSelected: (val) {
               if (val) {
@@ -219,7 +254,22 @@ class _BedManagementPageState extends ConsumerState<BedManagementPage> {
     );
   }
 
+  String _statusLabel(String status) {
+    final tr = ref.watch(translationsProvider);
+    switch (status) {
+      case 'Occupied':
+        return tr('hospital_bed_status_occupied');
+      case 'Maintenance':
+        return tr('hospital_bed_status_maintenance');
+      case 'Available':
+        return tr('hospital_bed_status_available');
+      default:
+        return status;
+    }
+  }
+
   Widget _buildBedMatrix() {
+    final tr = ref.watch(translationsProvider);
     final bedsList = ref.watch(bedCapacityProvider);
     final filteredBeds = bedsList.where((b) => b.ward == _selectedWard).toList();
 
@@ -258,7 +308,7 @@ class _BedManagementPageState extends ConsumerState<BedManagementPage> {
               _dischargePatient(bed.id, bed.patient ?? 'Unknown', bed.number);
             } else {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Bed is currently undergoing sanitary maintenance.')),
+                SnackBar(content: Text(tr('hospital_bed_maintenance_snack'))),
               );
             }
           },
@@ -281,7 +331,7 @@ class _BedManagementPageState extends ConsumerState<BedManagementPage> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  status == 'Occupied' ? (bed.patient ?? 'Occupied') : status,
+                  status == 'Occupied' ? (bed.patient ?? _statusLabel('Occupied')) : _statusLabel(status),
                   textAlign: TextAlign.center,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -300,6 +350,7 @@ class _BedManagementPageState extends ConsumerState<BedManagementPage> {
   }
 
   Widget _buildAdmissionCard(BedAllocation bed) {
+    final tr = ref.watch(translationsProvider);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -318,22 +369,22 @@ class _BedManagementPageState extends ConsumerState<BedManagementPage> {
                 style: GoogleFonts.outfit(fontWeight: FontWeight.bold, color: AppColors.primary),
               ),
               Text(
-                '${bed.days ?? 0} days admitted',
+                '${bed.days ?? 0} ${tr('hospital_bed_days_admitted')}',
                 style: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 11),
               ),
             ],
           ),
           const SizedBox(height: 8),
           Text(
-            bed.patient ?? 'Unknown Patient',
+            bed.patient ?? tr('hospital_bed_unknown_patient'),
             style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 14),
           ),
           Text(
-            'Health ID: ${bed.healthId ?? 'N/A'}',
+            '${tr('hospital_bed_health_id')}: ${bed.healthId ?? tr('hospital_bed_na')}',
             style: GoogleFonts.inter(fontSize: 12, color: AppColors.textSecondary),
           ),
           Text(
-            'Doctor: ${bed.doctor ?? 'Unassigned'}',
+            '${tr('hospital_bed_doctor')}: ${bed.doctor ?? tr('hospital_bed_unassigned')}',
             style: GoogleFonts.inter(fontSize: 12, color: AppColors.textSecondary),
           ),
           const SizedBox(height: 12),
@@ -349,7 +400,7 @@ class _BedManagementPageState extends ConsumerState<BedManagementPage> {
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
-              child: const Text('Discharge Workflow'),
+              child: Text(tr('hospital_bed_discharge_workflow')),
             ),
           ),
         ],

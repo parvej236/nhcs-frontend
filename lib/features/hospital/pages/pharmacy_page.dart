@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/providers/language_provider.dart';
 import '../data/models/pharmacy_item.dart';
 import '../data/repositories/hospital_repository.dart';
 import '../presentation/providers/hospital_providers.dart';
@@ -33,6 +34,7 @@ class _PharmacyPageState extends ConsumerState<PharmacyPage> {
   }
 
   void _dispensePrescription() async {
+    final tr = ref.read(translationsProvider);
     if (_loadedPrescription != null) {
       final String rxId = _loadedPrescription!['id'] ?? '';
       final success = await ref.read(pharmacyInventoryProvider.notifier).dispensePrescription(rxId);
@@ -46,7 +48,7 @@ class _PharmacyPageState extends ConsumerState<PharmacyPage> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('Prescription successfully dispensed. Inventory quantities updated!'),
+            content: Text(tr('hospital_pharm_dispense_success')),
             backgroundColor: AppColors.success,
           ),
         );
@@ -54,10 +56,10 @@ class _PharmacyPageState extends ConsumerState<PharmacyPage> {
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
-            title: Text('Stock Out Warning', style: GoogleFonts.outfit(color: AppColors.danger, fontWeight: FontWeight.bold)),
-            content: const Text('Insufficient stock or items not found in the hospital inventory formulary.'),
+            title: Text(tr('hospital_pharm_stock_out_warning'), style: GoogleFonts.outfit(color: AppColors.danger, fontWeight: FontWeight.bold)),
+            content: Text(tr('hospital_pharm_insufficient_stock')),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Dismiss')),
+              TextButton(onPressed: () => Navigator.pop(context), child: Text(tr('hospital_pharm_dismiss'))),
             ],
           ),
         );
@@ -67,6 +69,7 @@ class _PharmacyPageState extends ConsumerState<PharmacyPage> {
 
   @override
   Widget build(BuildContext context) {
+    final tr = ref.watch(translationsProvider);
     final inventoryList = ref.watch(pharmacyInventoryProvider);
     final query = _searchController.text.toLowerCase();
     
@@ -89,13 +92,29 @@ class _PharmacyPageState extends ConsumerState<PharmacyPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Dispensing Counter',
-                    style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.bold),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          tr('hospital_pharm_dispensing_counter'),
+                          style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.refresh_rounded, color: AppColors.primary),
+                        tooltip: tr('hospital_pharm_reload'),
+                        onPressed: () {
+                          ref.invalidate(pharmacyInventoryProvider);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(tr('hospital_pharm_reloaded')), duration: const Duration(seconds: 1)),
+                          );
+                        },
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Validate and dispense medications against electronic doctor prescriptions.',
+                    tr('hospital_pharm_dispensing_subtitle'),
                     style: GoogleFonts.inter(color: AppColors.textSecondary, fontSize: 13),
                   ),
                   const SizedBox(height: 24),
@@ -130,14 +149,14 @@ class _PharmacyPageState extends ConsumerState<PharmacyPage> {
                             padding: const EdgeInsets.all(16),
                             child: Row(
                               children: [
-                                Text('Formulary Inventory', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold)),
+                                Text(tr('hospital_pharm_formulary_inventory'), style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold)),
                                 const SizedBox(width: 24),
                                 Expanded(
                                   child: TextField(
                                     controller: _searchController,
-                                    decoration: const InputDecoration(
-                                      hintText: 'Search medicine formulary list...',
-                                      prefixIcon: Icon(Icons.search_rounded),
+                                    decoration: InputDecoration(
+                                      hintText: tr('hospital_pharm_search_formulary_hint'),
+                                      prefixIcon: const Icon(Icons.search_rounded),
                                     ),
                                     onChanged: (_) => setState(() {}),
                                   ),
@@ -148,7 +167,7 @@ class _PharmacyPageState extends ConsumerState<PharmacyPage> {
                           const Divider(height: 1),
                           Expanded(
                             child: filteredInventory.isEmpty
-                                ? Center(child: Text('No formulary matches found.', style: GoogleFonts.inter(color: AppColors.textSecondary)))
+                                ? Center(child: Text(tr('hospital_pharm_no_matches'), style: GoogleFonts.inter(color: AppColors.textSecondary)))
                                 : ListView.separated(
                                     itemCount: filteredInventory.length,
                                     separatorBuilder: (context, index) => const Divider(height: 1),
@@ -163,7 +182,7 @@ class _PharmacyPageState extends ConsumerState<PharmacyPage> {
                                           crossAxisAlignment: CrossAxisAlignment.end,
                                           children: [
                                             Text(
-                                              'Stock: ${item.stock}',
+                                              '${tr('hospital_pharm_stock')}: ${item.stock}',
                                               style: GoogleFonts.inter(
                                                 fontWeight: FontWeight.bold,
                                                 fontSize: 13,
@@ -194,6 +213,7 @@ class _PharmacyPageState extends ConsumerState<PharmacyPage> {
   }
 
   Widget _buildRxLookupCard() {
+    final tr = ref.watch(translationsProvider);
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -205,7 +225,7 @@ class _PharmacyPageState extends ConsumerState<PharmacyPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Lookup E-Prescription ID',
+            tr('hospital_pharm_lookup_eprescription'),
             style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 16),
@@ -214,10 +234,10 @@ class _PharmacyPageState extends ConsumerState<PharmacyPage> {
               Expanded(
                 child: TextField(
                   controller: _rxController,
-                  decoration: const InputDecoration(
-                    labelText: 'Prescription Code',
+                  decoration: InputDecoration(
+                    labelText: tr('hospital_pharm_prescription_code'),
                     hintText: 'e.g., RX-9921',
-                    prefixIcon: Icon(Icons.receipt_rounded),
+                    prefixIcon: const Icon(Icons.receipt_rounded),
                   ),
                   onSubmitted: (_) => _searchRx(),
                 ),
@@ -226,7 +246,7 @@ class _PharmacyPageState extends ConsumerState<PharmacyPage> {
               ElevatedButton.icon(
                 onPressed: _searchRx,
                 icon: const Icon(Icons.search_rounded),
-                label: const Text('Retrieve RX'),
+                label: Text(tr('hospital_pharm_retrieve_rx')),
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
                 ),
@@ -235,7 +255,7 @@ class _PharmacyPageState extends ConsumerState<PharmacyPage> {
           ),
           const SizedBox(height: 12),
           Text(
-            'Try searching "RX-9921" (Rahim Islam) or "RX-1024" (Jahanara Begum)',
+            tr('hospital_pharm_try_searching'),
             style: GoogleFonts.inter(fontSize: 11, color: AppColors.textMuted, fontStyle: FontStyle.italic),
           ),
         ],
@@ -244,6 +264,7 @@ class _PharmacyPageState extends ConsumerState<PharmacyPage> {
   }
 
   Widget _buildRxResultSection() {
+    final tr = ref.watch(translationsProvider);
     if (_loadedPrescription == null) {
       return Container(
         padding: const EdgeInsets.all(32),
@@ -258,12 +279,12 @@ class _PharmacyPageState extends ConsumerState<PharmacyPage> {
               const Icon(Icons.receipt_long_rounded, size: 48, color: AppColors.textMuted),
               const SizedBox(height: 16),
               Text(
-                'Prescription Record Not Found',
+                tr('hospital_pharm_record_not_found'),
                 style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               Text(
-                'Verify the RX number and search again.',
+                tr('hospital_pharm_verify_rx'),
                 textAlign: TextAlign.center,
                 style: GoogleFonts.inter(color: AppColors.textSecondary, fontSize: 13),
               ),
@@ -297,7 +318,7 @@ class _PharmacyPageState extends ConsumerState<PharmacyPage> {
                 const Icon(Icons.check_circle_outline, color: AppColors.primary, size: 20),
                 const SizedBox(width: 8),
                 Text(
-                  'Valid Prescription E-Signed',
+                  tr('hospital_pharm_valid_esigned'),
                   style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.primary),
                 ),
               ],
@@ -311,11 +332,11 @@ class _PharmacyPageState extends ConsumerState<PharmacyPage> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Patient: ${rx['patient']}', style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold)),
-                    Text('Code: ${rx['id']}', style: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 13)),
+                    Text('${tr('hospital_pharm_patient')}: ${rx['patient']}', style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold)),
+                    Text('${tr('hospital_pharm_code')}: ${rx['id']}', style: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 13)),
                   ],
                 ),
-                Text('Prescribed by: ${rx['doctor']} on ${rx['date']}', style: GoogleFonts.inter(color: AppColors.textSecondary, fontSize: 12)),
+                Text('${tr('hospital_pharm_prescribed_by')}: ${rx['doctor']} ${tr('hospital_pharm_on')} ${rx['date']}', style: GoogleFonts.inter(color: AppColors.textSecondary, fontSize: 12)),
                 const SizedBox(height: 16),
                 const Divider(),
                 const SizedBox(height: 12),
@@ -346,7 +367,7 @@ class _PharmacyPageState extends ConsumerState<PharmacyPage> {
                           ),
                         ),
                         Text(
-                          'Qty: ${item['qty']}',
+                          '${tr('hospital_pharm_qty')}: ${item['qty']}',
                           style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13),
                         ),
                       ],
@@ -359,7 +380,7 @@ class _PharmacyPageState extends ConsumerState<PharmacyPage> {
                   child: ElevatedButton.icon(
                     onPressed: _dispensePrescription,
                     icon: const Icon(Icons.done_all_rounded),
-                    label: const Text('Dispense Medications'),
+                    label: Text(tr('hospital_pharm_dispense_medications')),
                   ),
                 ),
               ],
@@ -371,6 +392,7 @@ class _PharmacyPageState extends ConsumerState<PharmacyPage> {
   }
 
   Widget _buildStockAlertsCard(List<PharmacyItem> inventoryList) {
+    final tr = ref.watch(translationsProvider);
     final lowStockItems = inventoryList.where((i) => i.stock < i.min).toList();
 
     return Container(
@@ -387,12 +409,12 @@ class _PharmacyPageState extends ConsumerState<PharmacyPage> {
             children: [
               const Icon(Icons.warning_amber_rounded, color: AppColors.danger, size: 22),
               const SizedBox(width: 8),
-              Text('Inventory Stock Warnings', style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold)),
+              Text(tr('hospital_pharm_stock_warnings'), style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold)),
             ],
           ),
           const SizedBox(height: 12),
           lowStockItems.isEmpty
-              ? Text('All medication inventory levels are normal.', style: GoogleFonts.inter(color: AppColors.success, fontSize: 13))
+              ? Text(tr('hospital_pharm_levels_normal'), style: GoogleFonts.inter(color: AppColors.success, fontSize: 13))
               : Column(
                   children: lowStockItems.map((item) {
                     return Container(
@@ -408,7 +430,7 @@ class _PharmacyPageState extends ConsumerState<PharmacyPage> {
                         children: [
                           Text(item.name, style: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.danger)),
                           Text(
-                            'Stock: ${item.stock} (Min: ${item.min})',
+                            '${tr('hospital_pharm_stock')}: ${item.stock} (${tr('hospital_pharm_min')}: ${item.min})',
                             style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.danger),
                           ),
                         ],

@@ -4,7 +4,10 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_colors.dart';
 import '../providers/auth_provider.dart';
+import '../providers/language_provider.dart';
 import '../utils/constants.dart';
+import '../../features/public/widgets/public_header.dart';
+import 'judge_role_switcher.dart';
 
 // Sidebar for patient role
 // Sidebar for patient role
@@ -17,81 +20,109 @@ class PatientSidebar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final t = AppColors.of(context);
+    final tr = ref.watch(translationsProvider);
     return Container(
       width: 260,
       decoration: BoxDecoration(
         color: t.bgCard,
         border: Border(right: BorderSide(color: t.border)),
       ),
-      child: Column(
-        children: [
-          const SizedBox(height: 32),
-          // Logo
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: InkWell(
-              onTap: () => context.go('/'),
-              borderRadius: BorderRadius.circular(12),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-                child: Row(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: IntrinsicHeight(
+                child: Column(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: t.brandPrimary,
-                        borderRadius: BorderRadius.circular(10),
+                    const SizedBox(height: 32),
+                    // Logo
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: InkWell(
+                        onTap: () => context.go('/'),
+                        borderRadius: BorderRadius.circular(12),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: t.brandPrimary,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Icon(Icons.health_and_safety, color: Colors.white, size: 24),
+                              ),
+                              const SizedBox(width: 12),
+                              Text('NHCS', style: GoogleFonts.outfit(color: t.textPrimary, fontSize: 22, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        ),
                       ),
-                      child: const Icon(Icons.health_and_safety, color: Colors.white, size: 24),
                     ),
-                    const SizedBox(width: 12),
-                    Text('NHCS', style: GoogleFonts.outfit(color: t.textPrimary, fontSize: 22, fontWeight: FontWeight.bold)),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          const WorkspaceSwitcher(),
-          const SizedBox(height: 24),
-          // Menu items
-          _buildMenuItem(context, 0, Icons.dashboard_rounded, 'Dashboard'),
-          _buildMenuItem(context, 1, Icons.timeline_rounded, 'Health Timeline'),
-          _buildMenuItem(context, 2, Icons.calendar_month_rounded, 'Appointments'),
-          _buildMenuItem(context, 3, Icons.folder_shared_rounded, 'Medical Vault'),
-          _buildMenuItem(context, 4, Icons.person_rounded, 'My Profile'),
-          _buildMenuItem(context, 5, Icons.auto_awesome_rounded, 'Healthcare AI'),
-          const Spacer(),
+                    const SizedBox(height: 12),
+                    const WorkspaceSwitcher(),
+                    const SizedBox(height: 12),
+                    const JudgeRoleSwitcher(),
+                    const SizedBox(height: 24),
+                    // Menu items
+                    _buildMenuItem(context, 0, Icons.dashboard_rounded, tr('menu_dashboard')),
+                    _buildMenuItem(context, 1, Icons.timeline_rounded, tr('menu_timeline')),
+                    _buildMenuItem(context, 2, Icons.calendar_month_rounded, tr('menu_appointments')),
+                    _buildMenuItem(context, 3, Icons.folder_shared_rounded, tr('menu_vault')),
+                    _buildMenuItem(context, 4, Icons.person_rounded, tr('menu_profile')),
+                    _buildMenuItem(context, 5, Icons.auto_awesome_rounded, tr('menu_healthcare_ai')),
+                    _buildMenuItem(context, 6, Icons.bloodtype_rounded, tr('menu_blood_donation')),
+                    const Spacer(),
 
-          // Logout
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: InkWell(
-              onTap: () async {
-                await ref.read(authProvider.notifier).logout();
-                if (context.mounted) {
-                  context.go('/');
-                }
-              },
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  color: t.danger.withValues(alpha: 0.1),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.logout_rounded, color: t.danger, size: 20),
-                    const SizedBox(width: 12),
-                    Text('Sign Out', style: GoogleFonts.inter(color: t.danger, fontSize: 14, fontWeight: FontWeight.w500)),
+                    // Language switcher
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('${tr('language')}:', style: GoogleFonts.inter(fontSize: 12, color: t.textSecondary)),
+                          const LanguageSwitcher(),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Logout
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: InkWell(
+                        onTap: () async {
+                          await ref.read(authProvider.notifier).logout();
+                          if (context.mounted) {
+                            context.go('/');
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            color: t.danger.withValues(alpha: 0.1),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.logout_rounded, color: t.danger, size: 20),
+                              const SizedBox(width: 12),
+                              Text(tr('menu_sign_out'), style: GoogleFonts.inter(color: t.danger, fontSize: 14, fontWeight: FontWeight.w500)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
                   ],
                 ),
               ),
             ),
-          ),
-          const SizedBox(height: 16),
-        ],
+          );
+        },
       ),
     );
   }
@@ -143,73 +174,100 @@ class DoctorSidebar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final tr = ref.watch(translationsProvider);
     return Container(
       width: 260,
       color: AppColors.sidebar,
-      child: Column(
-        children: [
-          const SizedBox(height: 32),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: InkWell(
-              onTap: () => context.go('/'),
-              borderRadius: BorderRadius.circular(12),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-                child: Row(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: IntrinsicHeight(
+                child: Column(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(10)),
-                      child: const Icon(Icons.medical_services_rounded, color: Colors.white, size: 24),
+                    const SizedBox(height: 32),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: InkWell(
+                        onTap: () => context.go('/'),
+                        borderRadius: BorderRadius.circular(12),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(10)),
+                                child: const Icon(Icons.medical_services_rounded, color: Colors.white, size: 24),
+                              ),
+                              const SizedBox(width: 12),
+                              Text('NHCS', style: GoogleFonts.outfit(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
-                    const SizedBox(width: 12),
-                    Text('NHCS', style: GoogleFonts.outfit(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Text('Doctor Portal', style: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 12)),
-          ),
-          const SizedBox(height: 12),
-          const WorkspaceSwitcher(),
-          const SizedBox(height: 24),
-          _buildMenuItem(0, Icons.dashboard_rounded, 'Dashboard'),
-          _buildMenuItem(1, Icons.edit_note_rounded, 'Clinical Workspace'),
-          _buildMenuItem(2, Icons.science_rounded, 'Report Review'),
-          _buildMenuItem(3, Icons.schedule_rounded, 'My Schedule'),
-          _buildMenuItem(4, Icons.person_rounded, 'Profile'),
-          const Spacer(),
+                    const SizedBox(height: 8),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Text(tr('portal_doctor'), style: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 12)),
+                    ),
+                    const SizedBox(height: 12),
+                    const JudgeRoleSwitcher(forceDark: true),
+                    const SizedBox(height: 12),
+                    const WorkspaceSwitcher(),
+                    const SizedBox(height: 24),
+                    _buildMenuItem(0, Icons.dashboard_rounded, tr('menu_dashboard')),
+                    _buildMenuItem(1, Icons.edit_note_rounded, tr('menu_clinical_workspace')),
+                    _buildMenuItem(2, Icons.science_rounded, tr('menu_report_review')),
+                    _buildMenuItem(3, Icons.schedule_rounded, tr('menu_schedule')),
+                    _buildMenuItem(4, Icons.person_rounded, tr('menu_profile')),
+                    const Spacer(),
 
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: InkWell(
-              onTap: () async {
-                await ref.read(authProvider.notifier).logout();
-                if (context.mounted) {
-                  context.go('/');
-                }
-              },
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), color: Colors.white.withOpacity(0.05)),
-                child: Row(
-                  children: [
-                    const Icon(Icons.logout_rounded, color: AppColors.danger, size: 20),
-                    const SizedBox(width: 12),
-                    Text('Sign Out', style: GoogleFonts.inter(color: AppColors.danger, fontSize: 14, fontWeight: FontWeight.w500)),
+                    // Language switcher
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('${tr('language')}:', style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted)),
+                          const LanguageSwitcher(),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: InkWell(
+                        onTap: () async {
+                          await ref.read(authProvider.notifier).logout();
+                          if (context.mounted) {
+                            context.go('/');
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                          decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), color: Colors.white.withOpacity(0.05)),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.logout_rounded, color: AppColors.danger, size: 20),
+                              const SizedBox(width: 12),
+                              Text(tr('menu_sign_out'), style: GoogleFonts.inter(color: AppColors.danger, fontSize: 14, fontWeight: FontWeight.w500)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
                   ],
                 ),
               ),
             ),
-          ),
-          const SizedBox(height: 16),
-        ],
+          );
+        },
       ),
     );
   }
@@ -250,72 +308,99 @@ class HospitalSidebar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final tr = ref.watch(translationsProvider);
     return Container(
       width: 260,
       color: AppColors.sidebar,
-      child: Column(
-        children: [
-          const SizedBox(height: 32),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: InkWell(
-              onTap: () => context.go('/'),
-              borderRadius: BorderRadius.circular(12),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-                child: Row(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: IntrinsicHeight(
+                child: Column(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(10)),
-                      child: const Icon(Icons.local_hospital_rounded, color: Colors.white, size: 24),
+                    const SizedBox(height: 32),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: InkWell(
+                        onTap: () => context.go('/'),
+                        borderRadius: BorderRadius.circular(12),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(10)),
+                                child: const Icon(Icons.local_hospital_rounded, color: Colors.white, size: 24),
+                              ),
+                              const SizedBox(width: 12),
+                              Text('NHCS', style: GoogleFonts.outfit(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
-                    const SizedBox(width: 12),
-                    Text('NHCS', style: GoogleFonts.outfit(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Text('Hospital Authority', style: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 12)),
-          ),
-          const SizedBox(height: 12),
-          const WorkspaceSwitcher(),
-          const SizedBox(height: 24),
-          _buildMenuItem(0, Icons.dashboard_rounded, 'Command Center'),
-          _buildMenuItem(1, Icons.receipt_long_rounded, 'Reception & Queue'),
-          _buildMenuItem(2, Icons.biotech_rounded, 'Laboratory'),
-          _buildMenuItem(3, Icons.bloodtype_rounded, 'Blood Donation'),
-          const Spacer(),
+                    const SizedBox(height: 8),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Text(tr('portal_hospital'), style: GoogleFonts.inter(color: AppColors.textMuted, fontSize: 12)),
+                    ),
+                    const SizedBox(height: 12),
+                    const JudgeRoleSwitcher(forceDark: true),
+                    const SizedBox(height: 12),
+                    const WorkspaceSwitcher(),
+                    const SizedBox(height: 24),
+                    _buildMenuItem(0, Icons.dashboard_rounded, tr('menu_command_center')),
+                    _buildMenuItem(3, Icons.fact_check_rounded, tr('menu_appointment_approvals')),
+                    _buildMenuItem(1, Icons.biotech_rounded, tr('menu_laboratory')),
+                    _buildMenuItem(2, Icons.bloodtype_rounded, tr('menu_blood_donation')),
+                    const Spacer(),
 
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: InkWell(
-              onTap: () async {
-                await ref.read(authProvider.notifier).logout();
-                if (context.mounted) {
-                  context.go('/');
-                }
-              },
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), color: Colors.white.withOpacity(0.05)),
-                child: Row(
-                  children: [
-                    const Icon(Icons.logout_rounded, color: AppColors.danger, size: 20),
-                    const SizedBox(width: 12),
-                    Text('Sign Out', style: GoogleFonts.inter(color: AppColors.danger, fontSize: 14, fontWeight: FontWeight.w500)),
+                    // Language switcher
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('${tr('language')}:', style: GoogleFonts.inter(fontSize: 12, color: AppColors.textMuted)),
+                          const LanguageSwitcher(),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: InkWell(
+                        onTap: () async {
+                          await ref.read(authProvider.notifier).logout();
+                          if (context.mounted) {
+                            context.go('/');
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                          decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), color: Colors.white.withOpacity(0.05)),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.logout_rounded, color: AppColors.danger, size: 20),
+                              const SizedBox(width: 12),
+                              Text(tr('menu_sign_out'), style: GoogleFonts.inter(color: AppColors.danger, fontSize: 14, fontWeight: FontWeight.w500)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
                   ],
                 ),
               ),
             ),
-          ),
-          const SizedBox(height: 16),
-        ],
+          );
+        },
       ),
     );
   }

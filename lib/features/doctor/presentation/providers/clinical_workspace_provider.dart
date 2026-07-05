@@ -180,7 +180,7 @@ class ClinicalWorkspaceNotifier extends StateNotifier<ClinicalWorkspaceState> {
 
     try {
       final repository = _ref.read(doctorRepositoryProvider);
-      
+
       final plan = TreatmentPlan(
         appointmentId: state.appointmentId,
         patientId: state.patientId,
@@ -195,10 +195,19 @@ class ClinicalWorkspaceNotifier extends StateNotifier<ClinicalWorkspaceState> {
         date: DateTime.now(),
       );
 
+      // Persist the treatment to the backend against the REAL patient. The
+      // prescription lands in the patient's Medical Vault
+      // (/patients/me/prescriptions) and each investigation becomes a pending
+      // order in the hospital Laboratory queue (/hospitals/lab-orders). A
+      // failure here is surfaced to the doctor — nothing is silently dropped.
       await repository.submitTreatmentPlan(plan);
+
       state = state.copyWith(isSubmitting: false, isSuccess: true);
     } catch (e) {
-      state = state.copyWith(isSubmitting: false, error: e.toString());
+      state = state.copyWith(
+        isSubmitting: false,
+        error: 'Submission failed: ${e.toString()}',
+      );
     }
   }
 

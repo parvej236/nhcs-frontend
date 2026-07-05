@@ -3,18 +3,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/widgets/sidebar.dart';
 import '../presentation/providers/hospital_providers.dart';
 import 'command_center_page.dart';
-import 'reception_queue_page.dart';
 import 'laboratory_page.dart';
 import 'blood_donation_management_page.dart';
+import 'appointment_approvals_page.dart';
 
 class HospitalShell extends ConsumerWidget {
   const HospitalShell({super.key});
 
   static const List<Widget> _pages = [
     CommandCenterPage(),
-    ReceptionQueuePage(),
     LaboratoryPage(),
     BloodDonationManagementPage(),
+    AppointmentApprovalsPage(),
   ];
 
   @override

@@ -20,7 +20,14 @@ class ApiEndpoints {
   static const String patientLabReports = '/patients/me/lab-reports';
   static const String patientImagingReports = '/patients/me/imaging-reports';
   static String cancelAppointment(String id) => '/patients/me/appointments/$id/cancel';
-  
+
+  // AI Health Copilot
+  static const String copilotBriefing = '/patients/copilot/briefing';
+  static const String copilotChat = '/patients/copilot/chat';
+  static const String copilotMedicationCheck = '/patients/copilot/medication-check';
+  static const String copilotRisk = '/patients/copilot/risk';
+  static const String copilotExplainReport = '/patients/copilot/explain-report';
+
   // Blood Donation
   static const String bloodDonationStatus = '/blood-donations/status';
   static const String bloodDonationToggle = '/blood-donations/toggle-donor';

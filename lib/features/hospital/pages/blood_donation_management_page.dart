@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/app_primitives.dart';
 import '../../../core/providers/dio_provider.dart';
 import '../../../core/network/api_endpoints.dart';
+import '../../../core/providers/language_provider.dart';
 
 class BloodDonationManagementPage extends ConsumerStatefulWidget {
   const BloodDonationManagementPage({super.key});
@@ -76,20 +77,21 @@ class _BloodDonationManagementPageState extends ConsumerState<BloodDonationManag
 
   Future<void> _notifyDonor(dynamic donor) async {
     if (_selectedRequestForMatching == null) return;
+    final tr = ref.read(translationsProvider);
     try {
       final dio = ref.read(dioProvider);
       final reqId = _selectedRequestForMatching['id'].toString();
       await dio.post(ApiEndpoints.hospitalBloodNotify(reqId));
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: Colors.green,
-          content: Text('Notification sent successfully to ${donor['name']}!'),
+          content: Text('${tr('hospital_blood_notify_success')} ${donor['name']}!'),
         ),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to notify donor: $e')),
+        SnackBar(content: Text('${tr('hospital_blood_notify_failed')}: $e')),
       );
     }
   }
@@ -97,6 +99,7 @@ class _BloodDonationManagementPageState extends ConsumerState<BloodDonationManag
   @override
   Widget build(BuildContext context) {
     final t = AppColors.of(context);
+    final tr = ref.watch(translationsProvider);
 
     // Filter pending and accepted requests
     final pendingRequests = _requests.where((r) => r['status'] == 'Pending').toList();
@@ -126,8 +129,8 @@ class _BloodDonationManagementPageState extends ConsumerState<BloodDonationManag
                     indicatorColor: t.brandPrimary,
                     labelStyle: GoogleFonts.inter(fontWeight: FontWeight.bold),
                     tabs: [
-                      Tab(text: 'Pending Requests (${pendingRequests.length})'),
-                      Tab(text: 'Accepted & Closed (${acceptedRequests.length})'),
+                      Tab(text: '${tr('hospital_blood_tab_pending')} (${pendingRequests.length})'),
+                      Tab(text: '${tr('hospital_blood_tab_accepted_closed')} (${acceptedRequests.length})'),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -157,6 +160,7 @@ class _BloodDonationManagementPageState extends ConsumerState<BloodDonationManag
   }
 
   Widget _buildHeader(AppColorTokens t) {
+    final tr = ref.watch(translationsProvider);
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -164,7 +168,7 @@ class _BloodDonationManagementPageState extends ConsumerState<BloodDonationManag
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Blood Donation Portal',
+              tr('hospital_blood_portal_title'),
               style: GoogleFonts.outfit(
                 fontSize: 28,
                 fontWeight: FontWeight.bold,
@@ -173,13 +177,13 @@ class _BloodDonationManagementPageState extends ConsumerState<BloodDonationManag
             ),
             const SizedBox(height: 4),
             Text(
-              'Manage patient blood requests and utilize AI matchmaking to locate active compatible donors.',
+              tr('hospital_blood_portal_subtitle'),
               style: GoogleFonts.inter(fontSize: 14, color: t.textSecondary),
             ),
           ],
         ),
         AppButton(
-          label: 'Refresh',
+          label: tr('hospital_blood_refresh'),
           icon: Icons.refresh_rounded,
           variant: AppButtonVariant.secondary,
           onPressed: _fetchRequests,
@@ -189,6 +193,7 @@ class _BloodDonationManagementPageState extends ConsumerState<BloodDonationManag
   }
 
   Widget _buildRequestsList(List<dynamic> list, bool isPending, AppColorTokens t) {
+    final tr = ref.watch(translationsProvider);
     if (list.isEmpty) {
       return Center(
         child: Column(
@@ -197,7 +202,7 @@ class _BloodDonationManagementPageState extends ConsumerState<BloodDonationManag
             Icon(Icons.bloodtype_outlined, size: 64, color: t.textSecondary.withOpacity(0.3)),
             const SizedBox(height: 16),
             Text(
-              isPending ? 'No pending blood requests' : 'No accepted blood requests',
+              isPending ? tr('hospital_blood_empty_pending') : tr('hospital_blood_empty_accepted'),
               style: GoogleFonts.inter(fontSize: 16, color: t.textSecondary),
             ),
           ],
@@ -246,7 +251,7 @@ class _BloodDonationManagementPageState extends ConsumerState<BloodDonationManag
                           Row(
                             children: [
                               Text(
-                                req['patientName'] ?? 'Unknown Patient',
+                                req['patientName'] ?? tr('hospital_blood_unknown_patient'),
                                 style: GoogleFonts.inter(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
@@ -276,8 +281,8 @@ class _BloodDonationManagementPageState extends ConsumerState<BloodDonationManag
                             spacing: 16,
                             runSpacing: 8,
                             children: [
-                              _buildMetaRow(Icons.local_hospital_rounded, req['hospital'] ?? 'General Hospital', t),
-                              _buildMetaRow(Icons.location_on_rounded, req['location'] ?? 'Unknown Location', t),
+                              _buildMetaRow(Icons.local_hospital_rounded, req['hospital'] ?? tr('hospital_blood_general_hospital'), t),
+                              _buildMetaRow(Icons.location_on_rounded, req['location'] ?? tr('hospital_blood_unknown_location'), t),
                               _buildMetaRow(Icons.access_time_filled_rounded, req['timeline'] ?? 'Urgent', t),
                             ],
                           ),
@@ -288,7 +293,7 @@ class _BloodDonationManagementPageState extends ConsumerState<BloodDonationManag
                     // Actions / Status indicators
                     if (isPending)
                       AppButton(
-                        label: 'Run AI Matcher',
+                        label: tr('hospital_blood_run_ai_matcher'),
                         icon: Icons.auto_awesome_rounded,
                         variant: AppButtonVariant.primary,
                         onPressed: () => _runAiMatcher(req),
@@ -307,7 +312,7 @@ class _BloodDonationManagementPageState extends ConsumerState<BloodDonationManag
                             Icon(Icons.check_circle_rounded, color: t.success, size: 16),
                             const SizedBox(width: 6),
                             Text(
-                              'Accepted',
+                              tr('hospital_blood_accepted'),
                               style: GoogleFonts.inter(
                                 color: t.success,
                                 fontSize: 13,
@@ -335,7 +340,7 @@ class _BloodDonationManagementPageState extends ConsumerState<BloodDonationManag
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'PATIENT MEDICAL HISTORY',
+                          tr('hospital_blood_patient_medical_history'),
                           style: GoogleFonts.inter(
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
@@ -372,7 +377,7 @@ class _BloodDonationManagementPageState extends ConsumerState<BloodDonationManag
                             Icon(Icons.volunteer_activism_rounded, color: t.success, size: 20),
                             const SizedBox(width: 8),
                             Text(
-                              'MATCHED DONOR DETAILS',
+                              tr('hospital_blood_matched_donor_details'),
                               style: GoogleFonts.inter(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
@@ -391,7 +396,7 @@ class _BloodDonationManagementPageState extends ConsumerState<BloodDonationManag
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    req['acceptedBy']['fullName'] ?? 'Unknown Donor',
+                                    req['acceptedBy']['fullName'] ?? tr('hospital_blood_unknown_donor'),
                                     style: GoogleFonts.inter(
                                       fontSize: 15,
                                       fontWeight: FontWeight.bold,
@@ -400,7 +405,7 @@ class _BloodDonationManagementPageState extends ConsumerState<BloodDonationManag
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    'Blood Group: ${req['acceptedBy']['bloodGroup'] ?? 'O+'}  •  Address: ${req['acceptedBy']['address'] ?? 'Dhanmondi, Dhaka'}',
+                                    '${tr('hospital_blood_blood_group_label')}: ${req['acceptedBy']['bloodGroup'] ?? 'O+'}  •  ${tr('hospital_blood_address_label')}: ${req['acceptedBy']['address'] ?? 'Dhanmondi, Dhaka'}',
                                     style: GoogleFonts.inter(fontSize: 13, color: t.textSecondary),
                                   ),
                                 ],
@@ -420,7 +425,7 @@ class _BloodDonationManagementPageState extends ConsumerState<BloodDonationManag
                                   Icon(Icons.phone_rounded, color: t.brandPrimary, size: 16),
                                   const SizedBox(width: 8),
                                   SelectableText(
-                                    req['acceptedBy']['contactNumber'] ?? 'No contact',
+                                    req['acceptedBy']['contactNumber'] ?? tr('hospital_blood_no_contact'),
                                     style: GoogleFonts.outfit(
                                       color: t.brandPrimary,
                                       fontWeight: FontWeight.bold,
@@ -459,6 +464,7 @@ class _BloodDonationManagementPageState extends ConsumerState<BloodDonationManag
   }
 
   Widget _buildAiMatcherSidebar(AppColorTokens t) {
+    final tr = ref.watch(translationsProvider);
     return Container(
       width: 440,
       decoration: BoxDecoration(
@@ -490,7 +496,7 @@ class _BloodDonationManagementPageState extends ConsumerState<BloodDonationManag
                           Icon(Icons.auto_awesome_rounded, color: t.brandPrimary, size: 20),
                           const SizedBox(width: 8),
                           Text(
-                            'AI Donor Matcher',
+                            tr('hospital_blood_ai_donor_matcher'),
                             style: GoogleFonts.outfit(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
@@ -501,7 +507,7 @@ class _BloodDonationManagementPageState extends ConsumerState<BloodDonationManag
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Searching compatible active donors for ${_selectedRequestForMatching['patientName']}',
+                        '${tr('hospital_blood_searching_for')} ${_selectedRequestForMatching['patientName']}',
                         style: GoogleFonts.inter(fontSize: 12, color: t.textSecondary),
                       ),
                     ],
@@ -518,13 +524,13 @@ class _BloodDonationManagementPageState extends ConsumerState<BloodDonationManag
           // Matches results list
           Expanded(
             child: _isLoadingMatches
-                ? const Center(
+                ? Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        CircularProgressIndicator(),
-                        SizedBox(height: 16),
-                        Text('Analyzing donor pool & location factors...'),
+                        const CircularProgressIndicator(),
+                        const SizedBox(height: 16),
+                        Text(tr('hospital_blood_analyzing')),
                       ],
                     ),
                   )
@@ -538,7 +544,7 @@ class _BloodDonationManagementPageState extends ConsumerState<BloodDonationManag
                               Icon(Icons.warning_rounded, size: 48, color: t.textSecondary.withOpacity(0.5)),
                               const SizedBox(height: 16),
                               Text(
-                                'No matching active donors found in the database.',
+                                tr('hospital_blood_no_matches'),
                                 textAlign: TextAlign.center,
                                 style: GoogleFonts.inter(fontSize: 14, color: t.textSecondary),
                               ),
@@ -578,7 +584,7 @@ class _BloodDonationManagementPageState extends ConsumerState<BloodDonationManag
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
                                           Text(
-                                            match['name'] ?? 'Unknown Donor',
+                                            match['name'] ?? tr('hospital_blood_unknown_donor'),
                                             style: GoogleFonts.inter(
                                               fontSize: 15,
                                               fontWeight: FontWeight.bold,
@@ -605,7 +611,7 @@ class _BloodDonationManagementPageState extends ConsumerState<BloodDonationManag
                                               ),
                                               const SizedBox(width: 8),
                                               Text(
-                                                'Distance: ${match['distance']} km',
+                                                '${tr('hospital_blood_distance')}: ${match['distance']} ${tr('hospital_blood_km')}',
                                                 style: GoogleFonts.inter(
                                                   fontSize: 12,
                                                   color: t.textSecondary,
@@ -627,7 +633,7 @@ class _BloodDonationManagementPageState extends ConsumerState<BloodDonationManag
                                         borderRadius: BorderRadius.circular(20),
                                       ),
                                       child: Text(
-                                        '$matchScore% MATCH',
+                                        '$matchScore% ${tr('hospital_blood_match')}',
                                         style: GoogleFonts.outfit(
                                           color: isEligible ? t.success : t.textSecondary,
                                           fontWeight: FontWeight.w800,
@@ -650,7 +656,7 @@ class _BloodDonationManagementPageState extends ConsumerState<BloodDonationManag
                                     const SizedBox(width: 6),
                                     Expanded(
                                       child: Text(
-                                        isEligible ? 'Donor is active, healthy & eligible to donate.' : 'Deferred: ${match['reason']}',
+                                        isEligible ? tr('hospital_blood_eligible_desc') : '${tr('hospital_blood_deferred')}: ${match['reason']}',
                                         style: GoogleFonts.inter(
                                           fontSize: 12,
                                           color: isEligible ? t.textSecondary : Colors.orange,
@@ -665,7 +671,7 @@ class _BloodDonationManagementPageState extends ConsumerState<BloodDonationManag
                                 SizedBox(
                                   width: double.infinity,
                                   child: AppButton(
-                                    label: 'Send Match Request',
+                                    label: tr('hospital_blood_send_match_request'),
                                     icon: Icons.send_rounded,
                                     variant: isEligible 
                                       ? AppButtonVariant.primary 

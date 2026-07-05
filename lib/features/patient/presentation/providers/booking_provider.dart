@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/legacy.dart';
+import '../../../../core/providers/doctor_queue_provider.dart';
 import '../../data/models/appointment.dart';
 import '../../data/repositories/patient_repository.dart';
 import 'patient_providers.dart';
@@ -126,9 +127,23 @@ class BookingNotifier extends StateNotifier<BookingState> {
         timeSlot: state.selectedTimeSlot!,
       );
       state = state.copyWith(isLoading: false, createdAppointment: app);
-      
-      // Add the new appointment to the listing provider directly
+
+      // Add the new appointment to the patient's own listing directly.
       ref.read(patientAppointmentsProvider.notifier).addAppointment(app);
+
+      // Also push it straight into the booked doctor's live queue — no hospital
+      // confirmation step. The doctor's Dashboard reflects it immediately.
+      ref.read(doctorQueueProvider.notifier).addBookedPatient(
+            name: app.patientName,
+            age: int.tryParse(app.patientAge) ?? 40,
+            gender: app.patientGender,
+            // Use the real health ID resolved by the backend (NUD-000-<id>) so
+            // the doctor's Clinical Workspace loads the actual patient — not a
+            // hardcoded/placeholder ID.
+            healthId: app.patientHealthId.isNotEmpty ? app.patientHealthId : healthId,
+            time: state.selectedTimeSlot ?? app.timeSlot,
+            visitType: 'First Consultation',
+          );
       return true;
     } catch (e) {
       state = state.copyWith(isLoading: false, errorMessage: e.toString());
