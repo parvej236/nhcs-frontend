@@ -34,8 +34,11 @@ RUN flutter pub get
 # Copy all source files
 COPY . .
 
+# Accept API URL build-time variable
+ARG API_URL
+
 # Build web application
-RUN flutter build web --release
+RUN flutter build web --release --dart-define=API_URL=$API_URL
 
 # Stage 2: Production environment using Nginx
 FROM nginx:alpine
